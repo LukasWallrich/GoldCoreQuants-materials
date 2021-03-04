@@ -15,7 +15,7 @@ output:
 Load the `tidyverse`, `interactions` and `car` packages - you might need to install the latter. Remember that you can use `pacman::p_load()` to combine `install.packages()` and `library()` into one.
 
 ```{r setup}
-
+pacman::p_load(tidyverse, interactions, car)
 ```
 
 # Simpson's paradox and the importance of interactions
@@ -25,7 +25,7 @@ Please test whether penguin's bill length is related to their bill depth (basica
 ```{r}
 penguins <- read_csv("https://raw.githubusercontent.com/allisonhorst/palmerpenguins/master/inst/extdata/penguins.csv")
 
-#Plot bill depth versus bill length and add a lm() regression line.
+#Plot bill depth versus bill length and add a "lm" regression line.
 #What is the relationship?
 ggplot(data = penguins, aes(x = bill_depth_mm, y = bill_length_mm)) +
  _____

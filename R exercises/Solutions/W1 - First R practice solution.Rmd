@@ -1,0 +1,154 @@
+---
+title: "Core Quants Week 1 Class"
+author: "YOUR NAME"
+date: "14/11/2019"
+output: html_document
+---
+
+*The header above contains metadata for the document (i.e. data about the document)* - make sure to enter your name for homework and exams.
+
+# Part 1: some introductions
+
+## Setup section of the markdown document
+
+*The above are titles on two levels*
+
+```{r setup, include=FALSE}
+#Anything in the code with a # in front is a comment ignored by R. You are highly encouraged to use them frequently in your work to make sure you remember what you did and that a reader can follow your code
+
+#This first section should generally include options that you want to change and the functions to load packages that you want to use in the whole document. Those are loaded with library(). At the moment, we don't need anything here.
+
+```
+
+## Code for the initial worksheet (for your reference)
+
+```{r}
+1 * 2 * 3 * 4 * 5 #Product of the numbers
+(28+6*31+3*30+19)/365 * 100 #Share of the year
+
+#Just for illustration, this is how you could do this dynamically, for example as part of a regular progress report  - no need to worry about details, just note that functions can be nested and are then evaluated inside out:
+as.numeric((Sys.Date() - as.Date("2019-01-01"))/365) * 100 
+#Internally, days are saved as the number of days since a given start date - so they can be subtracted to get the number of days between 2 dates.
+
+sum(c(1,2,3,4,5)) #sum of a vector of numbers
+mean(c(1,2,3,4,5)) #mean of a vector of numbers
+
+x <- c(1,2,3,4,5)
+x
+
+sum(x)
+
+
+#Logical comparisons
+x < 3 #Checks for each element in x whether it is smaller than 3
+x > 3 #... whether it's larger
+any(x > 3) #checks whether at least one of the comparisons is TRUE
+all(x > 3) #Checks whether all comparisons are true
+
+x == 3 #whether it is exactly three, remember that == is needed for comparison
+
+3 %in% x #Whether 3 is anywhere in the vector
+
+!(x==3) #! means not and thus turns TRUE into FALSE and FALSE into TRUE
+
+#Dealing with text
+my_name <- "Lukas"
+paste("Hello", my_name)
+
+```
+
+# Part 2: looking at the gapminder dataset
+
+Let's now look at some real data from the gapminder dataset. For that, we need to load it into R - the dslabs package makes that easy.
+
+```{r}
+#install.packages("dslabs") - you might have done that already - otherwise run it now in the console after removing the #
+
+#Now load the dslabs package with the library function
+library(dslabs)
+
+#Now we can access the gapminder dataframe (that is R's word for a table of variables) - back to the Console for some exploration
+#use head(), tail() and str() on gapminder and see if you can make sense of the output. Note: "Factors" are just R's name for categorical variables
+
+head(dslabs) #shows the first few lines (standard: 6 lines, can adjust with n = argument)
+tail(dslabs) #last few lines
+str(dslabs) #list of variables and types: numeric, factor (categorical) or text
+
+#As always, you can use the ? operator to get more information about elements in a package (of course that would not be so easy if this was a normal research dataset). So type ?gapminder into the console and take a look
+
+?gapminder
+
+```
+
+# Part 3: exploring the gapminder dataset visually
+
+Let's use some basic graphs to understand distributions and relationships between variables.
+
+## Distribution of life expectancy
+
+```{r}
+#For this, we will use parts of the tidyverse package (mostly ggplot2), so let's load that
+library(tidyverse)
+
+#For now, we will focus on the year 2010
+gapminder2010 <- filter(gapminder, year==2010)
+
+#Let's look at life expectacy across the world. For that, we create a histogram with ggplot2. ggplot commands always have three parts:
+#ggplot(DATA, aes(VARIABLES)) + geom_CHARTTYPE()
+#so plot a geom_histogram() of life expectancy in 2010
+ggplot(gapminder2010, aes(life_expectancy)) + geom_histogram()
+
+#Additional variables can be added to other parts of the chart. We might wonder how the life expectancy is distributed across continents. Adding fill=continent into aes adds that information (not in a way that is presentable, but this is about exploration)
+ggplot(gapminder2010, aes(life_expectancy, fill = continent)) + geom_histogram()
+
+```
+
+What are your key insights from the chart? Note them down here. Note that you can make lists in RMarkdown by leaving a line empty and then starting the lines with *
+
+* Insight 1: Most countries have life expectancies above 70 years
+* Insight 2: African countries tend to have the lowest life expectancies
+
+## Relationship between fertility and income mortality
+
+1) Click Insert above to add a new R code block. 
+2) Then use that to make a scatter plot that shows the relationship between fertility and life expectancy in 2010. For that, you need an x and y variable in aes() within the ggplot command and use the geom_point() chart type. 
+3) Next, make another chart that adds information about the continent as the color of the points: aes(x= ____, y = _____, col = ____)
+4) How would you interpret the chart? You should be able to give at least two separate reasons that might explain the relationship.
+
+```{r}
+ggplot(gapminder2010, aes(x=life_expectancy, y=fertility)) + geom_point()
+ggplot(gapminder2010, aes(x=life_expectancy, y=fertility, col = continent)) + geom_point()
+
+```
+
+* Observation: Higher life expectancy goes along with lower fertility
+* Interpretation 1: A good healthcare system might increase access to family planning services and increase life expectancies, thus explaining the connection.
+* Interpretation 2: Lower fertility might lead to fewer infant deaths, and thus to higher average life expectancy.
+
+
+## Bonus - time permitting: Infant mortality over time
+
+1) Again insert a new R code block.
+2) Then use that to make a line plot that shows the development of life expectancy over time. For that, use the full gapminder dataset rather than gapminder 2010, assign year to the x axis and life_expectancy to the y-axis (within the aes() function). Then use geom_smooth() to get ggplot to draw a line that smoothly shows the estimated typical life expectancy per year (note that this does not just show averages but more complex estimates but it is an easy way to get a sense of the trend)
+3) To show a line for each continent, you need to assign continent to either col  or linetype in aes(). Try both and decide which looks better.
+4) What are your main take-aways from the chart?
+
+```{r}
+ggplot(gapminder, aes(x=year, y=life_expectancy)) + geom_smooth()
+ggplot(gapminder, aes(x=year, y=life_expectancy, col = continent)) + geom_smooth()
+ggplot(gapminder, aes(x=year, y=life_expectancy, linetype = continent)) + geom_smooth()
+
+```
+
+For screen display, colours are probably more helpful. Linetypes can be good for black-and-white printing.
+
+*Key observations could be*:
+
+* Average life expectancy has been increasing in all continents over the past half-century.
+* The gaps between the continents have narrowed over that timeframe, particularly due to large increases in Asia and Africa.
+
+## Wrapping up
+
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

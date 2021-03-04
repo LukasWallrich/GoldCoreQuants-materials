@@ -1,0 +1,82 @@
+---
+title: "Core Quants Week 10 classwork"
+author: "YOUR NAME"
+date: "18/02/2021"
+output: html_document
+---
+
+# A note of caution
+
+This exercise is about fixing **wrong code** - I believe that it will be helpful to learn how to spot and fix common mistakes. However, you need to be mindful that you will see wrong code here, so make sure to focus on remembering the *corrected* versions. One strategy to find the mistakes might be to write your own code to complete the task - obviously following the strategy I used rather than something completely different - and then compare. *Take note* of the mistakes made, so that you can avoid them in the future.
+
+For this exercise, we will go back to the `dslabs` package as it offers various datasets we can use here. Note than if you ever overwrite one of these datasets, you can run `rm(gapminder)` - or whatever dataset to use - to remove your copy and get R to go back to the version included in `dslabs`. To get more information about the dataset, call up its help page with the ? operator in the console, e.g., `?brexit_polls`
+
+```{r}
+library(tidyverse)
+library(dslabs)
+```
+
+
+# Summarising and mutating data
+
+```{r}
+#Using gapminder, calculate the average life expectancy in Africa 
+## - fix three mistakes per line
+
+gapminder %>% filter(continent = Africa)
+
+gapminder %>% mean("life_expectancy")
+
+#Calculate the gdp_per_capita for each line in gapminder - fix two mistakes (closely related)
+#(if you have modified the dataset above, run rm(gapminder) to get the original dataset from dslabs back)
+gapminder$gdp_per_capita <- gapminder %>% mutate(gdp/population)
+
+#Calculate the average fertility per continent and the number of rows included in that calculation - three mistakes
+gapminder %>% by(continent) %>% summarise(mean_fertility <- mean(fertility, na.rm = TRUE), n_rows = count())
+
+#Using olive dataset
+#Calculate a new variable that shows the combined share of linoleic and linolenic acid - fix one mistake
+
+olive <- olive %>% mutate(tot_lino = sum(linoleic, linolenic))
+
+
+```
+
+# Plotting data
+
+```{r}
+#Create a histogram of life_expectancy in gapminder, with the bars filled in different colours to indicate the continent - four mistakes
+ggplot(gapminder, aes(life_expectancy, color = "continent") %>% geom_histogram()
+
+#Show life expectancy per continent in a bar chart sorted from smallest to largest - two mistakes
+gapminder %>% group_by(continent) %>% summarise(M_life_expectancy = mean(life_expectancy, na.rm = TRUE)) %>% ggplot(aes(x=continent, y=life_expectancy)) + geom_bar()
+
+#Additional task: turn the chart above from vertical into horizontal bars (that is generally a good idea when your labels are not very short), and order the continents from longest to shortest life expectancy.
+```
+#Statistical modeling
+
+```{r}
+#Test whether there is a significant relationship between infant_mortality and fertility in Asia - one mistake per line
+#Challenge, but not necessary: get this fixed by changing only 1-2 letters per line. For the first, you would first need to load the magrittr package
+
+gapminder %>% filter(continent == "Asia") %>% cor.test(infant_mortality, fertility)
+gapminder %>% filter(continent == "Asia") %>% lm(infant_mortality ~ fertility)
+
+#In the temp_carbon dataset, test whether the ocean_anomaly and the land_anomaly variables form a consistent scale (note that Cronbach's alpha is not necessarily the best measure for two-item scales, but let's ignore that for now) - two mistakes
+
+temp_carbon %>% alpha(land_anomaly, ocean_anomaly)
+
+#Find a way to only show `raw_alpha` rather than all the output - the more focused you can be in your exam output, the better, since that will allow the reader to focus on your message
+____
+
+#Check whether there was a significant difference between YouGov and ICM results in their Brexit polls (`brexit_polls` dataset) - two mistakes
+brexit_polls %>% filter(pollster %in% c("Yougov", "ICM")) %>% t.test(pollster ~ spread, .)
+
+```
+
+
+# Wrapping up
+
+If there are lines that you did not manage to fix (or where you did not even find the issue), make sure to have a look at the sample solution. If you have any questions, please post them in the R Help forum on learn.gold - you won't be the only one.
+
+

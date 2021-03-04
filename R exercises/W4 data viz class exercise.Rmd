@@ -1,0 +1,80 @@
+---
+title: "Core Quants Week 4 classwork"
+author: "YOUR NAME"
+date: "05/12/2019"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+# Loading data into R
+
+So far, we have worked with datasets in R packages - those are simple to use for teaching and learning, but your own research data (and the exam data) will not come in packages. Instead, there are functions to read data from Excel, SPSS, webpages, databases and pretty much any other source. We will first focus on getting data from Excel into R.
+
+The base and tidyverse functions do not support .xlsx files, but only files with comma-separated values, .csv (or tab-separated values, .tsv). If you want to read Excel files directly, you can install the readxl package, but for now I will ask you to use the Save As command in Excel to save your data as a .csv file.
+
+So please open the Excel file from learn.gold, select one of the sheets with a dataset that you find interesting, and then save that sheet as a csv file. 
+
+- If you want to learn more the soccer dataset, have a look [here](https://fivethirtyeight.com/methodology/how-our-club-soccer-predictions-work/)
+- If you want to learn more about the Covid polls, check the additional file on learn.gold. The other two datasets do not come with specific documentation. In any case, don't spend too much time on understanding the data in detail, rather focus on columns that are clear.
+
+```{r setup, include=FALSE}
+
+library(tidyverse) #includes dplyr, ggplot2 and readr
+
+#include the filename of your .csv data file. Ideally, you should have this document and the data in the same folder, otherwise, you can enter the filepath either completely, e.g., D:/data/test.csv, or as a relative reference starting with ., e.g., ./data/test.csv would look for a data folder in the folder that this document is in.
+
+myData <- read_csv("____")
+
+#when you run this, R will tell which datatype it assigns to each column - usually characters and number (col_double) are correctly identified, but if something goes wrong, have a look at ?read_csv to see how to use the col_types argument to fix that. However, often we are not interested in characters as such, but rather use them to express different levels of a categorical variable, for example "male" and "female". If that is the case, R should know that they are "factors" - you can either convert individual variables using the as.factor() function or all character variables using the as.data.frame(stringsAsFactors = TRUE) function. In the case of the datasets for the graphs, this is worth doing.
+
+myData <- as.data.frame(myData, stringsAsFactors = TRUE)
+
+#Sometimes dates are difficult to parse. If you use data with a date column and it is not read properly (which you can check by using the range() function on that column), you can use the lubridate package to convert the text into a date. Have a look at the class exercise for Week 3 to see an example.
+
+#Having loaded the data, it is always worth checking if it looks right. The dim(), str()/glimpse() and head() functions help. Many people prefer glimpse() to str() but they give very similar information - up to you. Run all four on your data and remind yourself of what each of them does.
+_____
+_____
+_____
+_____
+
+```
+
+# Creating a chart
+
+Use your data to create a ggplot chart. Make sure to include at least
+- data
+- aesthetics
+- geometries
+- and a theme, including axis labels and a title
+
+Also consider using facets if that can support your message. For all of that, having the ggplot2 cheat sheet at hand will be helpful: https://github.com/rstudio/cheatsheets/raw/master/data-visualization-2.1.pdf
+
+But before you start to finetune the chart, explore the data with simple summary functions and charts, and then sketch out on paper what you would like your main chart to look like.
+
+```{r}
+
+#If you want to map data from different columns onto one aesthetics and then map the column names onto a different aesthetics (for example polling share of parties, or different measures of the gender pay gap) you need to convert the data from wide into long format, using the gather() function from the tidyr package. We will briefly discuss this together.
+
+#If you need that, uncomment this code. If you use the gender pay gap data, you will also need to replace which variables to gather (con:oth)
+
+#myDataLong <- myData %>% gather(con:oth, key="party", value="share") 
+
+```
+
+# Exporting the chart
+
+If you knit a document to HTML, the chart will be included as a picture, which you can then save and use in Word or elsewhere. You can also use screenshots to save the charts. Finally, you can use the ggsave function. The only required argument is the filename. By default, this saves the last plot displayed - if you want to export a specific plot, you can save it into an object and then pass that object to the plot argument. ?ggsave will open the help with information on other arguments.
+
+```{r}
+#Save your (main) chart as a png file with an appropriate size (A4 paper is 29x21 cm, so you can think about what part of a page it should take up.)
+
+
+```
+
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

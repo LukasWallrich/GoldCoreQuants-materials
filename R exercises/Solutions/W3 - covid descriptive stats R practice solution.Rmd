@@ -1,0 +1,152 @@
+---
+title: "Core Quants Week 3 Class"
+author: "YOUR NAME"
+date: "03/12/2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+In this practice, we will look at Covid data on tests, cases and deaths from England. For that, you need to download the data (W3_Covid_data.csv) and ideally place this file and the data into the same folder.
+
+First let's load the required packages. That is done with the library function. We only need the tidyverse for now.
+
+```{r}
+library(tidyverse)
+```
+
+
+# Load data
+
+You can find details on how to load data on our  [module notes page](https://lukaswallrich.github.io/GoldCoreQuants/importing-and-describing-data.html). However, for now you can just follow the instructions.
+
+```{r}
+# Load the data and save it in a dataframe called covid_data. To type the filename, you can press the Tab key with the cursor within the "" - then a list of files in the folder will appear. You can type part of the filename (e.g., W3) and then select from the list. col_types tells R what to do with each column - here, the first column should be read as text, then two columns skipped, then one read as a factor (categorical variable), and then five as numbers. You can leave that part exactly as is. 
+
+covid_data <- read_csv(file = "W3_Covid_data.csv", col_types = "c--fnnnnn")
+
+# Now we need to turn the first column into a date - the lubridate package (part of the tidyverse, but not loaded automatically) makes that quite easy, with functions designed to accommodate most possible ordering. Here the date is given as day/month/year, so that the dmy() function will work - just run the following line as is (with the ::, we can access a single function from a package without loading the entire package)
+
+covid_data <- covid_data %>% mutate(date = lubridate::dmy(date))
+
+```
+
+
+# Prepare and explore data
+
+```{r}
+#Use glimpse() to have a look at the dataframe (if you run it here, the output will be below this chunk, so you can also run it in the Console, but then remember to copy the code in below). 
+glimpse(covid_data)
+
+#What does each row represent? Keep that in mind for the future analyses.
+## Each row is the daily report from one English region.
+
+# We should know what timespan the data covers. For that, use range() on the date
+
+range(covid_data$date)
+
+# Then we might wonder what regions are covered. You can use the dplyr function count() to count how often each unique value occurs, which is also a quick way to see the unique values
+
+covid_data %>% count(areaName)
+
+# We might want to refer to population sizes in later analyses. At the moment, population is not included in the data, but we can calculate it. We have the cumulative number of cases per 100k and the total cumulative number of cases. Population is calculated as follows, but you need to create the dplyr mutate syntax around it
+
+covid_data <- covid_data %>% mutate(population = cumCasesBySpecimenDate/cumCasesBySpecimenDateRate*100000)
+
+# NOTE: The above code has one problem: when the rate is 0, i.e. at the very start of the pandemic, R returns Inf (infinity) rather than an error or NA. You can test diving 1/0 to see. This was entirely unexpected to me - sorry - so we need to fix that. A situation where Google really helps: https://stackoverflow.com/questions/18881032/force-division-by-zero-default-to-nan-instead-of-inf - which gives us two options:
+
+# Option A:
+# [] can be used to subset a variable based on a logical comparison - so here I assign NA to any values of population that are not finite.
+covid_data$population[!is.finite(covid_data$population)] <- NA
+
+# Option B:
+# This uses the fact that one cannot calculate with Inf by adding 0 times the possible Inf value inside the original mutate call - if cumCasesBySpecimenDateRate is 0, this will now return NaN (not a number), which is a missing value that can be ignored by mean, sum, etc. 
+covid_data <- covid_data %>% mutate(population = cumCasesBySpecimenDate/cumCasesBySpecimenDateRate*100000 + 0*(1/cumCasesBySpecimenDateRate))
+
+#You are obviously not expected to come up with either of these solutions - but you should be able to spot the problem later on (when deaths and cases by population are always 0), and will become increasingly comfortable with then finding solutions online.
+
+# After such a calculation, it is always a good idea to sense-check the results. What population of England does this indicate for the first of December? (I.e. filter for the first of December, then sum up the population across all rows, using the summarise() function). If you get a result close to 56mn, then this method probably works well enough.
+
+covid_data %>% filter(date == "2020-12-01") %>% summarise(sum(population))
+
+```
+
+
+# Summary statistics for the whole UK
+
+Note that there is a lot of missing data in this dataset, mostly for the months before Covid arrived to the UK. Therefore, most functions will fail to calculate summary statistics. Include na.rm = TRUE in the calls to mean(), sd(), sum() etc to get them to ignore the missing values.
+
+```{r}
+
+# How many tests have been carried out to date? (NOTE: You cannot answer this with the current dataset that is split by region. That data is missing. Unfortunately, PHE does not seem to publish this by region. In case you want to have a go at exploring this data for the UK as a whole, you can download it here: https://coronavirus.data.gov.uk/details/download
+
+# How many cases have there been?
+sum(covid_data$newCasesByPublishDate, na.rm = TRUE)
+
+# How many deaths have there been?
+sum(covid_data$newDeaths28DaysByDeathDate, na.rm = TRUE)
+
+# OR with dplyr - one advantage is that you can name the output
+covid_data %>% summarise(cases = sum(newCasesByPublishDate, na.rm = TRUE), deaths = sum(newDeaths28DaysByDeathDate, na.rm = TRUE))
+
+# What is the total case fatality rate? (I.e. share of cases that end in death?)
+covid_data %>% summarise(fatality_rate = sum(newDeaths28DaysByDeathDate, na.rm = TRUE)/sum(newCasesByPublishDate, na.rm = TRUE))
+# I.e. 3.9% of people with positive tests have died within 28 days. Note that this is much higher than the estimated case fatality rates, which suggests that the data on cases might be incomplete.
+```
+
+
+# Summary statistics by region
+
+```{r}
+# How many cases have been in each region? Use dplyr group_by() and then summarise(). Name the outputs within summarise, e.g., summarise(cases = sum(newCasesByPublishDate))
+
+covid_data %>% group_by(areaName) %>% summarise(cases = sum(newCasesByPublishDate, na.rm = TRUE)) %>% arrange(desc(cases))
+
+# What is the case fatality rate per region? 
+covid_data %>% group_by(areaName) %>% summarise(fatality_rate = sum(newDeaths28DaysByDeathDate, na.rm = TRUE)/sum(newCasesByPublishDate, na.rm = TRUE)) %>% arrange(desc(fatality_rate))
+
+# How many death per 100,000 population have there been per region. (Hint: divide by mean(population, trim = 0.2) to reduce rounding errors in our population estimation, which happened at the start when there were very few cases). Arrange your results to be shown with the highest number of deaths at the top, using arrange(desc(____))
+
+covid_data %>% group_by(areaName) %>% summarise(deaths_per_100k = sum(newDeaths28DaysByDeathDate, na.rm = TRUE)/(mean(population, na.rm = TRUE)/100000)) %>% arrange(desc(deaths_per_100k))
+
+# What is the average of the total number of cases per region? Calculate both mean and median, as well as the standard deviation. Hint: you will need to summarise twice for this, first by region, then overall. What is the different interpretation between mean and median?
+
+covid_data %>% group_by(areaName) %>% 
+  summarise(cases = sum(newCasesByPublishDate, na.rm = TRUE)) %>%
+  summarise(mean_cases = mean(cases), median_cases = median(cases), sd_cases = sd(cases))
+
+#Note that mean and median here are very similar - this suggests that there are no enormous outliers - different from what we have seen in the case of income.
+
+```
+
+
+# Changes over time
+
+Let's see if we can create something like the familiar curves and add our thoughts about the importance of the number of tests 
+
+```{r}
+# First, let's calculate the number of cases and deaths / 100k population. This can all be done in one mutate call.
+covid_data <- covid_data %>% mutate(deaths_per_100k = newDeaths28DaysByDeathDate/(population/100000), cases_per_100k = newCasesByPublishDate/(population/100000))
+
+# Let's plot each of these against time by region.
+
+# For cases, something very weird happened in July - if we wanted to understand the data, we would need to dig deeper. Also, we clearly have missing data for the first wave.
+ggplot(covid_data, aes(x = date, y = cases_per_100k, color = areaName)) + geom_line() + labs(title = "New cases per 100,000 people", x = "Date", y = "New cases", color = "Region")
+
+# For deaths, there are no such obvious data issues, but we might need to think about different colours as some are hard to tell apart - something we will explore a little bit in the future, but that you can read about in the data visualisation books
+ggplot(covid_data, aes(x = date, y = deaths_per_100k, color = areaName)) + geom_line() + labs(title = "New deaths per 100,000 people", x = "Date", y = "New deaths", color = "Region")
+
+# These line plots are very much influenced by day-to-day variations, which is good to identify data problems - apart from that, a moving average might be more easier to follow (and closer to the way it is usually displayed) - the idea there is that each day, the mean of the day and the three days before and after is plotted. How to do that is beyond the scope of this course, but if you are keen, this tutorial on plotting covid-data is quite interesting: https://www.storybench.org/how-to-calculate-a-rolling-average-in-r/
+
+
+```
+
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

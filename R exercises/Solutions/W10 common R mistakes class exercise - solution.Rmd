@@ -1,0 +1,153 @@
+---
+title: "Core Quants Week 10 classwork solution"
+author: "Lukas Wallrich"
+date: "18/02/2021"
+output: html_document
+---
+
+# Solutions
+
+Below, I show the corrected code as well as brief commentary regarding what was wrong. If anything is unclear, please ask.
+
+For this exercise, we will go back to the `dslabs` package as it offers various datasets we can use here. Note than if you ever overwrite one of these datasets, you can run `rm(gapminder)` - or whatever dataset to use - to remove your copy and get R to go back to the version included in `dslabs`. To get more information about the dataset, call up its help page with the ? operator in the console, e.g., `?brexit_polls`
+
+```{r message=FALSE}
+library(tidyverse)
+library(dslabs)
+```
+
+
+# Summarising and mutating data
+
+```{r}
+#Using gapminder, calculate the average life expectancy in Africa 
+## - fix three mistakes per line
+
+gapminder %>% filter(continent == "Africa") %>%
+  summarise(mean(life_expectancy, na.rm = TRUE))
+```
+
+- R never changes data in place - so just filtering gapminder without saving the result will have no influence on future lines. The easiest way here is to combine the two steps into one pipe.
+- `==` for comparisons, `=` only for setting arguments in functions and names in `mutate`, `summarise`, `rename` etc.
+- Strings (`"Africa"`) always need to be in quotation marks. Variable names should not be (`life_expectancy`), at least within the tidyverse.
+- Summary functions should only be used with the pipe inside summarise - remember that the pipe places the left-hand side as the first argument of the right-hand side function, and ~~`mean(gapminder, life_expectancy)`~~ is not correct.
+- `mean()` needs to be called with `na.rm = TRUE` when you have missing data
+
+```{r}
+#Calculate the gdp_per_capita for each line in gapminder - fix two mistakes (closely related)
+#(if you have modified the dataset above, run rm(gapminder) to get the original dataset from dslabs back)
+
+#Either
+gapminder <- gapminder %>% mutate(gdp_per_capita = gdp/population)
+#Or
+gapminder$gdp_per_capita <- gapminder$gdp/gapminder$population
+```
+
+- All dplyr functions return dataframes, so it makes no sense to assign them to individual variables. If you ever want to call variables directly, using the `$`, best stay clear of dplyr functions.
+
+```{r}
+#Calculate the average fertility per continent and the number of rows included in that calculation - three mistakes
+gapminder %>% group_by(continent) %>% summarise(mean_fertility = mean(fertility, na.rm = TRUE), n_rows = n())
+```
+
+- `group_by()` instead of `by()`
+- Within `summarise`, use `=` to name the different summary statistics. `<-` should only be used to create stand-alone objects.
+- To count the number of rows, ususally after `group_by()`, use `n()`. `count()` counts the number of times each value appears within a specific variable, and thus needs an x argument (and returns a dataframe, so that it cannot be used inside summarise). 
+
+```{r}
+#Using olive dataset
+#Calculate a new variable that shows the combined share of linoleic and linolenic acid - fix one mistake
+
+olive <- olive %>% mutate(tot_lino = linoleic + linolenic)
+```
+
+- `sum()` and other summary functions return one value for the entire dataset - if you use them in mutate, each row will contain the same value. If you can, use basic calculations (i.e. `+`) instead. If you can't, e.g., for minimum and maximum values, check the rowwise function such as `rowSums()` or `pmin()` or dplyr's `rowwise()`
+
+
+# Plotting data
+
+```{r}
+#Create a histogram of life_expectancy in gapminder, with the bars filled in different colours to indicate the continent - four mistakes
+ggplot(gapminder, aes(life_expectancy, fill = continent)) + geom_histogram()
+```
+
+- Check for missing brackets - the second closing bracket usually needed in ggplot() is one of the most common mistakes.
+- Again, pass variable names as bare text, not within "" - this does not throw an error, but just colours everything the same, since "continent" is just one specific word.
+- `ggplot2` elements are combined with `+`, not with `%>%`. 
+- Filling something with a colour is done with `fill =`, while `color =` concerns outlines. (Note that this is not a great visualisation - but fill is very useful in other circumstances.)
+
+```{r}
+#Show life expectancy per continent in a bar chart sorted from smallest to largest - two mistakes
+gapminder %>% group_by(continent) %>% summarise(M_life_expectancy = mean(life_expectancy, na.rm = TRUE)) %>% ggplot(aes(x=fct_reorder(continent, M_life_expectancy), y=M_life_expectancy)) + geom_col() + coord_flip()
+
+#Additional task: turn the chart above from vertical into horizontal bars (that is generally a good idea when your labels are not very short)
+```
+
+- `summarise()` changes variable names - that then needs to be reflected inside `aes()`. 
+- `geom_bar()` automatically sets the y-axis to contain a count, which might be helpful if you wanted to show how many rows contain information on each continent. If you want to be able to define your own y-value, you either need to use stat = "identity" as an argument to geom_bar() or, more easily, geom_col() instead.
+- To switch x and y-axis, use `coord_flip()`, to order a categorical axis by the values on another variable, use `fct_reorder(variable, by)`. Obviously, that then really calls for new axis labels, but that's not the focus here.
+
+# Statistical modeling
+
+```{r}
+#Test whether there is a significant relationship between infant_mortality and fertility in Asia - one mistake per line
+#Challenge, but not necessary: get this fixed by changing only 1-2 letters per line. For the first, you would first need to load the magrittr package
+
+gapminder %>% filter(continent == "Asia") %>% lm(infant_mortality ~ fertility, .)
+
+library(magrittr)
+gapminder %>% filter(continent == "Asia") %$% cor.test(infant_mortality, fertility)
+```
+
+- Neither `cor.test()` nor `lm()` accept a dataset as their first argument. Therefore, you cannot use them with `%>%` quite as easily as others. 
+- For `lm()`, you can just use the `.` as a placeholder for the value that comes from the pipe, to make sure that it is placed in the second position.
+- `cor.test()` does not take a data argument, but only two variables. In those cases, you can use the `%$%` operator from the `magrittr` package that temporarily makes the variables in a dataset available without putting `gapminder$` in front of them. With that, `gapminder %$% mean(life_expectancy, na.rm = TRUE)` also works. However, if you find that confusing, just filter the dataset, save it in a new variable, and then call `cor.test(data$var1, data$var2)` as per usual.
+
+```{r}
+#In the temp_carbon dataset, test whether the ocean_anomaly and the land_anomaly variables form a consistent scale (note that Cronbach's alpha is not necessarily the best measure for two-item scales, but let's ignore that for now) - two mistakes
+temp_carbon %>% select(land_anomaly, ocean_anomaly) %>% psych::alpha()
+```
+
+- You either need to load the `psych`-package (`library(psych)`) or call `psych::alpha()`, directing R to the right package manually.
+- `alpha()` works on a full dataset - so you need to select the right variables before you call it.
+
+
+```{r}
+#Find a way to only show `raw_alpha` rather than all the output - the more focused you can be in your exam output, the better, since that will allow the reader to focus on your message
+
+#Either
+library(magrittr)
+temp_carbon %>%
+  select(land_anomaly, ocean_anomaly) %>%
+  psych::alpha() %>%
+  extract2("total") %>%
+  extract("raw_alpha")
+
+#Or
+scale_info <- temp_carbon %>%
+  select(land_anomaly, ocean_anomaly) %>%
+  psych::alpha()
+
+#str(scale_info)
+
+scale_info[["total"]]["raw_alpha"]
+```
+
+- You can extract individual values from complex objects either with magrittr functions in pipes, or with base R notation. In either case, you need to use `str()` to identify where the value is saved and what it is called. (You could also use that, for instance, to extract R2 from the information returned by the `summary()` function on an `lm()` model.)
+- When you pull out data, `extract()` and `[]` retain the datatype (a list or dataframe), while `extract2()` and `[[]]` simplify it. You will usually need `extract2()`. Here, I use `extract()` in the second step because that retains the column title.
+
+```{r}
+#Check whether there was a significant difference between YouGov and ICM results in their Brexit polls (`brexit_polls` dataset) - two mistakes
+brexit_polls %>%
+  filter(pollster %in% c("YouGov", "ICM")) %>%
+  t.test(spread ~ pollster, .)
+```
+
+- Capitalisation matters - here, You**G**ov contained a small typo.
+- `lm()` and `t.test()` require continuous outcomes that may be predicted by categorical variables - so the formula here needs to be switched around.
+
+# Wrapping up
+
+If you did not manage to fix any of the lines (or did not even find the issue in them), make sure to have a look at the sample solution. If you have any questions, please post them in the R Help forum on learn.gold - you won't be the only one.
+
+

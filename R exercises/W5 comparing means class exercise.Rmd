@@ -1,0 +1,206 @@
+---
+title: "Core Quants Week 5 classwork"
+author: "YOUR NAME"
+date: "12/12/2019"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+
+# Part 1: Formal tests for differences between groups/conditions
+
+## Loading data into R
+
+So far, we have often worked with datasets in R packages - those are simple to use for teaching and learning, but your own research data (and the exam data) will not come in packages. Instead, there are functions to read data from Excel, SPSS, webpages, databases and pretty much any other source. You can look at the W4 classwork to see how to get data from Excel into R and find instructions for anything else on Google.
+
+You can also save objects in your workspace into .RDS files - that is a native R format that preserves variable classes and is quite efficient, but cannot be opened by anyone who does not use R. To save RDS files, use the write_rds() function in the readr package; to read RDS files, use read_rds().
+
+Today, we are looking at two datasets:
+
+* *pay_gap*: the mean salary for male and female associate professors at a random sample of 22 US universities
+* *player_heights*: the height (in inches) of a random sample of 40 professional basketball and 45 professional football players 
+
+## Loading data
+
+```{r setup, include=FALSE}
+
+#Load the tidyverse - includes the readr package
+
+____
+
+#Load the data from the two RDS files. To keep it simple, you can put this document and the data in the same folder; otherwise, you can enter the filepath either completely, e.g., "D:/data/t-tests.RData", or as a relative reference starting with ., e.g., "./data/t-tests.RData" would look for a data folder in the folder that this document is in.
+
+
+pay_gap <- read_rds("gender_pay_gap.RDS")
+player_height <- ______
+
+#For your reference: code I used to make the RDS files.
+#pay_gap <- readxl::read_excel("genderPay.xlsx")
+#player_height <- readxl::read_excel("playerHeight.xlsx")
+#write_rds(pay_gap, "gender_pay_gap.RDS")
+#write_rds(player_height, "player_height.RDS")
+
+```
+
+Look at the data, using glimpse() in the console. From the way the data look, which is a repeated-measures dataset and which has independent samples:
+
+* Independent samples / between participants: ___
+* Repeated measures / within participants: ____
+
+
+# Descriptive statistics and exploratory charts
+
+We want to know whether the differences between the pay for men and women and the height of basketball players are statistically significant. Before doing the inferential tests, let's check what to expect from descriptive statistics and charts.
+
+```{r}
+#Plot histograms to test whether both samples in player_height and the differences between MALES and FEMALES in pay_gap are roughly normally distributed. 
+
+#For payGap, you can let ggplot calculate the difference by mapping FEMALES-MALES onto x (inside aes()). With so few datapoints over a small range, it's worth setting the binwidth (i.e. the range of values covered by each bar) to something sensible; in this case I am suggesting  bins that are 500 USD wide. You can try out different values and see what happens.
+
+_____ + geom_histogram(binwidth = 0.5)
+
+#For player_height, if you prefer meters to feet, you can use the mutate function to convert the Height variable. 1 meter is 3.281 feet. Best do the conversion so that we all get the same results.
+
+____
+
+#In the Height histogram, a larger binwidth than the default is again better. Set it to 0.05 (i.e. 5 cm). The easiest way to get the two separate histograms for the two sports is to use + facet_wrap(.~Sports). 
+
+____
+
+#Do the distributions look approximately normal? They are close enough. They also already give an indication whether women are paid less and basketball players are taller. What does that look like to you? Then let's see if these impressions are confirmed when calculating the means.
+
+#For gender_pay
+____
+
+#For player height, the data looks different, so we need calculate two means from the same column. Use the dplyr group_by function to do that.
+
+____ %>% group_by(Sports) %>% ____
+
+```
+
+Now we have seen that there are differences in the directions you (probably) expected. However, we still need to know how likely such differences would have been to occur by chance. Time to run inferential tests.
+
+# Running the t-tests
+
+```{r}
+#Use the t.test() function to run tests on both datasets
+
+#Remember, to test whether there is a difference between two conditions x and y observed for the same 'participant', the command is t.test(x, y, paired = TRUE)
+
+_____
+
+#To test for a difference between two groups, it is t.test(score ~ group, data = df)
+
+____
+
+```
+
+**Conclusions** - can we conclude that there are significant differences between
+
+* Male and female associate professors' salaries: _____
+* The height of basketball and football players: ______
+
+What exactly do the *p*-values mean?
+______
+
+# Part 2: Inference based on simulations
+
+While you will mostly rely on formal significance tests in the exams, an understanding of simulation approaches can help with understanding the concepts and give you a tool that is applicable to situations when formal tests are hard to apply, or plainly do not work.
+
+To simulate, you need to understand two functions - firstly, to simulate data:
+
+- sample(x, size, replace). This draws a certain number of observations (size) from a set of possible values (x), either replacing values after each draw or not. For simulations, replace should usually be TRUE.
+
+An example:
+```{r}
+#Simulate how many 6 I get when throwing 10 fair dice
+#(remember that 1:6 is equal to c(1, 2, 3, 4, 5, 6))
+
+#Simulate 10 throws of a die
+throws <- sample(1:6, size = 10, replace = TRUE)
+
+#Calculate number of 6s
+sum(throws == 6)
+
+```
+
+
+Now the whole point of simulations is to get more than one result. For that, you can use the replicate(n, expr) function that runs an expression (expr) n times. Ideally, that expression should return the one value you are interested in.
+
+To ensure that we get reliable simulation results, let's always run 10,000 simulations.
+
+```{r}
+#Simulate how many 6s I would get if I threw 10 dice 1000 times
+number_sixes <- replicate(10000,
+          (sample(1:6, size = 10, replace = TRUE)==6) %>% sum()
+          )
+
+#This returns an integer vector, but ggplot needs a dataframe - so to get a histogram, I need to run the following
+ggplot(data.frame(number_sixes = number_sixes), aes(x=number_sixes)) + geom_histogram()
+
+#What is the mean?
+mean(number_sixes)
+
+#How often would I get at least 3 sixes?
+mean(number_sixes>=3)
+```
+
+Use this to answer the following two questions
+
+## Does a plurality want Boris to resign?
+
+A recent poll found that 43% want Boris Johnson to resign, while 40% want him to stay in office. Simulate how often a 3%-difference or more would emerge if both opinions were held by 40% of the population and you surveyed 100 people (hint: to simulate whether someone is part of that 40%, you could sample numbers from 1:10 and test whether the number is smaller than 5)
+
+```{r}
+
+share_stay <- replicate(____,
+          _____
+          )
+
+share_resign <- #Remember, we are simulating the null-hypothesis, under which this is based on the same population parameters - same code - as share_stay, so you can copy-paste the code
+
+mean(abs((share_stay-share_resign))>=0.03) #Note that in this case, we care about a difference either way - the abs() function removes the sign
+
+```
+
+Based on a sample of 100, a 3%-point difference would seem more likely to be due to sampling error than substantive differences. Now, in reality, most opinion polls are based on larger samples. This one was based on 2,003 examples. How likely would that difference be to emerge just due to change with that sample size?
+
+```{r}
+
+____
+
+```
+
+What would be the p-value associated with the hypothesis that "more people want Boris Johnson to resign than to stay?"
+
+____
+
+Based on this, should the Guardian have claimed that "more people want Boris Johnson to resign than to stay?"
+
+___
+
+## Drop-out gap at Goldsmiths
+
+Goldsmiths has put quite a lot of effort into identifying reasons for the awarding gap, i.e. the gap in final (undergraduate) degree classifications between White and minority-ethnic students [see Report](https://www.gold.ac.uk/media/documents-by-section/about-us/governance/reports-and-statements/PDF---BAME-analysis-2019-Update.pdf).
+
+In that data, the authors are very concerned that Black students are dropping out at a higher rate than White students. They observe that in 2017-18, 24.7% of Black students (out of a total of 291) but only 16.6% of White students (out of a total of 1162). How likely would we be to observe such a difference due to chance, if drop-out was unrelated to ethnicity and everyone had the sample probability of dropping out (18.7%)?
+
+```{r}
+
+____
+
+```
+
+What would be the p-value associated with the hypothesis that "Black students are more likely to drop out than White students"?
+
+____
+
+## Making simulations replicable
+
+A final note. When working with simulations (or bootstrapping), your results with change very time. To ensure that you get the same results when you run the code again, and the same results as your colleagues, use the set.seed() function to determine the starting value of the random number generator. So before you knit this, add set.seed(300688) at the very top where you load the tidyverse
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

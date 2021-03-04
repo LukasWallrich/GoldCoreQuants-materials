@@ -1,0 +1,79 @@
+---
+title: "Core Quants Week 4 classwork"
+author: "YOUR NAME"
+date: "05/12/2019"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+# Loading data into R
+
+I have decided to use the 538 soccer prediction dataset as an example here. Therefore, I have saved that sheet from the Excel file into `soccer.csv` which is saved in the same folder as this file. 
+
+```{r setup, include=FALSE}
+
+library(tidyverse) #includes dplyr, ggplot2 and readr
+
+soccer_data <- read_csv("soccer.csv")
+
+#Looking at the output, most columns were correctly identified as the default. League and teams are categorical variables that I will convert into factors, while the date needs to be converted as a date.
+
+#To convert the date, I need to understand what it looks like. 
+soccer_data$date %>% head()
+soccer_data$date %>% tail()
+
+#The output from head() is ambiguous, but tail() shows that it follows the day, month, year format. Therefore, the dmy() function from lubridate can be used to convert it.
+
+soccer_data <- soccer_data %>% mutate(date = lubridate::dmy(date))
+
+#To test the conversion (and understand the dataset), I calculate the range of dates covered
+range(soccer_data$date)
+
+
+
+#Having loaded the data, it is always worth checking if it looks right. The dim(), str()/glimpse() and head() functions help. Many people prefer glimpse() to str() but they give very similar information - up to you. Run all four on your data and remind yourself of what each of them does.
+dim(soccer_data)
+head(soccer_data)
+str(soccer_data)
+glimpse(soccer_data)
+
+#This reminds me that the league and the two teams are still stored as characters, even though they should be factors (categorical variables with a limited number of potential values). So I will convert them.
+
+soccer_data <- soccer_data %>% mutate(league = as_factor(league), team1 = as_factor(team2))
+
+#Also, I am only interested in one season
+soccer_data <- soccer_data %>% filter(season == 2019, league %in% c("German Bundesliga", "Barclays Premier League"))
+
+```
+
+# Creating a chart
+
+I am interested in the surprising teams - i.e. those whose rating changed most.
+
+```{r}
+#To simplify, I will select each team's first and last appearance as home team - we could repeat the analysis with team2
+soccer_data_start_end <- soccer_data %>% group_by(league, team1) %>% filter(date == min(date) | date == max(date)) %>% arrange(date) %>% summarise(start = spi1[1], end = spi1[2]) %>% mutate(change = end-start) %>% group_by(league) %>% slice_max(abs(change), n = 5)
+
+
+#Now I combine the two datapoints. The easiest is to use the dplyr join_ functions. If you need help with such a processing step, let me know.
+                 
+ggplot(soccer_data_start_end, aes(x=change, y = fct_reorder(team1, change), fill = change)) + geom_col() + facet_wrap(~league, nrow = 2, scales = "free_y") + scale_fill_gradient(low = "red", high = "green") + theme_minimal() + labs(title = "Most surprising performances in 2019/20 season", subtitle = "Change in 538 power index, 5 largest changes per league shown", x = "Change from start to end of season", y = "") + theme(legend.position = "none")                                                        
+                                                             
+                                                             
+
+
+
+
+
+
+
+```
+
+
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

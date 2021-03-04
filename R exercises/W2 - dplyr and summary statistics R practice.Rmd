@@ -1,0 +1,80 @@
+---
+title: "Core Quants Week 2 Class"
+author: "YOUR NAME"
+date: "21/11/2019"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+#Some descriptive statistics and dplyr pipes
+
+___ indicates that you need to fill a gap there
+
+## Central tendency
+
+```{r setup, include=FALSE}
+#load required packages
+library(tidyverse) #included dplyr and ggplot2
+library(dslabs)
+```
+
+```{r}
+#You again have the gapminder dataset available. Let's add gdpPerCap (roughly average income per person). 
+#You just need to type the function that creates a new variable
+
+gapminder <- gapminder %>% _______(gdpPerCap = gdp/population)
+
+#Let's look at the year 2010 - just add the function that lets you filter the rows that meet a given condition
+gapminder2010 <- gapminder %>% ____(year == 2010)
+
+#Let's find the mean life_expectancy in the dataset
+
+____(gapminder2010$life_expectancy, na.rm=T) #na.rm: remove missing values, fails otherwise
+
+#Note that this is equivalent to this longer pipe - unnecessary if you just want one number, helpful as soon as you need more
+gapminder2010 %>% summarise(mean(life_expectancy, na.rm = TRUE))
+
+#Let's find the mean and median gdpPerCap
+____
+____
+
+#What is the difference in their interpretation?
+
+#What is the following? How does it's interpretation differ from the mean above?
+weighted.mean(gapminder2010$gdpPerCap, w = gapminder2010$population, na.rm = TRUE)
+
+
+#Mode: what is the most frequent region?
+#Use the dplyr verbs count() to get the number per region and arrange(desc()) to sort that with the highest number on top
+gapminder2010 %>% _____(region) %>% ____(____(region))
+```
+
+## Measures of dispersion
+
+These are more interesting per continent. So let's build something like the example in the video
+
+```{r}
+#Calculate SD and range for life_expectancy and gdpPerCap per continent: group_by continent, then select the two variables we are interested in, then summarise_all with list(sd, range_diff)
+
+#Here a problem comes up: range() does not return the range but the minimum and maximum. One solution is to create our own function, which we will not cover in detail, but this is how it works (no need to change anything in that line, but you need to run it to save the function in the range_diff object)
+range_diff <- function (x, ...) {diff(range(x, ...))}
+
+#Fill in the blanks here with the appropriate dplyr 'verbs' (i.e. functions)
+gapminder2010 %>%  ______(continent) %>% ____(life_expectancy, gdpPerCap) %>% ____(list(sd, range_diff), na.rm=T)
+
+#In the output, we now don't see what the values actually are - so let's run this again and name the functions by using list(std_dev = sd, range = range_diff) or any other names you might like
+_____
+
+#Which continent has the largest/smallest dispersion in life_expectancy and gdpPerCap?
+
+#What causes the large range of life expectancies in the Americas? Hint: filter() the data set by continent to only retain countries in the Americas, then arrange() it by life_expectancy to find the extremes
+____
+
+```
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

@@ -1,0 +1,117 @@
+---
+title: "Core Quants Week 7 classwork"
+author: "YOUR NAME"
+date: "28/01/2021"
+output: html_document
+---
+
+# Exploring UK general election results
+
+I downloaded some data on the General Election 2019 results and on each constituency from the Library of Parliament webpage. Let's explore a couple more relationships. The section below just reads and prepares the data - nothing for you to edit, but have a look to make sure you understand what is going on.
+
+```{r}
+library(tidyverse)
+constituencies <- read_csv(url("http://empower-training.de/Gold/ConstituencyData2019.csv"), col_types = "_cfddddfffddddfffdfdddd")
+
+#Some data is missing - this is now shown as parsing failures. Feel free to ignore that - if using your own data, you would need to check again what is going on.
+
+#We exclude Northern Ireland due to the different party landscape and create new "nation" variable to show whether a constituency is in England, Wales or Scotland
+constituencies <- constituencies %>% 
+  filter(RegionName != "Northern Ireland") %>%
+          mutate(nation = case_when(RegionName == "Scotland" ~ "Scotland",
+                                    RegionName == "Wales" ~ "Wales",
+                                    T ~ "England"))
+
+#Exclude Chorley - the Speaker's constituency, which is a weird case with no Conservative (or other major party) candidate
+constituencies <- constituencies %>% filter(ConstituencyName != "Chorley")
+
+```
+
+*Have a look at the dataset to see what variables are included. Develop at least one hypothesis you find interesting and would be able to test with linear regression.* The deprivation level of a constituency is associated with lower support for the Conservatives.
+
+## Diversity and support for the Conservatives
+
+```{r}
+
+#There are two indicators in the dataset that might measure diversity - which are they? What are their units? There is a difference in how they are coded - fix that to make them more comparable.
+
+constituencies <- constituencies %>% mutate(ShareChristianPerc = ShareChristian * 100)
+
+#Do they individually predict the conservative vote share? Check the scatterplots to see whether a linear relationship can be assumed. You might decide that you need to filter the data before proceeding.  
+ggplot(constituencies, aes(x= ShareUKbornPerc, y=ElectionConShare, col=nation)) + geom_point(alpha = .3)
+
+ggplot(constituencies, aes(x= ShareChristianPerc, y=ElectionConShare, col=nation)) + geom_point(alpha = .3)
+
+constituencies_england <- constituencies %>% filter(nation == "England")
+
+#Run individual linear model (with lm()) to test whether they are significant predictors of the Conservative's vote share
+
+lm(ElectionConShare ~ ShareChristianPerc, constituencies_england) %>% summary()
+lm(ElectionConShare ~ ShareUKbornPerc, constituencies_england) %>% summary()
+
+#What happens when you put them into the same model? Compare the R2 values to the values for the models with just one predictor to see how much unique variance each variable explains, and decide which is the more important predictor.
+
+lm(ElectionConShare ~ ShareChristianPerc + ShareUKbornPerc, constituencies_england) %>% summary()
+
+```
+
+*Report your results in a couple of full sentences:* Individually, both the share of voters born in the UK and the share of voters who are Christian are associated with the Conservative's vote share in English constituencies (other nations appear to show different patterns and were excluded from this analysis). For each percentage point of voters who are born in the UK, the Conservative's vote share is predicted to be 0.7 percentage points higher, *p* < .001, while each percentage point of voters who identify as Christian as associated with a 0.8 percentage point higher Conservative vote share, *p* < .001. However, when both predictors are included into the same linear regression model, it becomes clear that the share of voters born inside the UK is the more influential predictor. While the model with only the share born in the UK as a predictor explains 30.9% of the variance in Conservative vote shares, the addition of the share of Christians only marginally increases this, to 31.7%.
+
+## What is the link between turnout and the Conservative share?
+
+We can use multiple regression to control for variables that we know to influence the result, but that we are not interested in - often that will be some kind of baseline scores that vary between participants. For example, if we want to test how some factors affected the 2019 election in particular, it might be helpful to control for the 2017 result.
+
+```{r}
+#Run a simple linear model to test whether turnout predicts the conservative vote share. Is there a relationship? In what direction?
+lm(ElectionConShare ~ Turnout, constituencies) %>% summary()
+
+#Add ConShare2017 as a predictor to that model. What changes? How much unique variance is explained by 2019 turnout?
+lm(ElectionConShare ~ Turnout + ConShare2017, constituencies) %>% summary()
+```
+
+A simple linear regression model suggests that high turnout is associated with a higher Conservative vote share, with each percentage point in turnout associated with a 0.8 percentage point higher Conservative vote share, *p* < .001. However, the results of a multiple regression model that controls for the Conservative's vote share in the 2017 election suggests that 2019 turnout in fact favoured the opposition. Specifically, when controlling for the Conservative's 2017 vote share, each percentage point in turnout in 2019 was associated with a 0.5 percentage point decrease in the Conservative's 2019 vote share.
+
+## Extension activity: candidate gender and electoral success
+
+Just using the data given, how could you try to see whether candidate gender affected election outcomes? You might suggest an attempt for which we don't have a significant test yet, in that case, descriptive statistics are sufficient.
+
+```{r}
+#A simple test - do female Conservative candidates 
+#get higher/lower vote shares than males
+t.test(ElectionConShare ~ ConGender, constituencies)
+
+```
+
+There are many limitations to this - for instance, it might be that more of the men were incumbents and more of the women were challengers (or placed in safe vs marginal seats), and, of course, the gender effect differs by party. However, in 2019, female conservative candidates received a  lower share of the vote than male candidates, 39.6% vs 46.0%, *t*(337.4) = 4.35, *p* < .001.
+
+# Returning to the height vs income correlation
+
+Last week, we established that height predicts household income in the UK - I provide the code below. Now check whether the result is explained by the relationship between height and gender, in combination with the gender pay gap.
+
+For that,
+
+-   map gender (`gndr`) onto color in the plot aesthetics
+-   install the moderndive package (`library(moderndive)`) and use `+ moderndive::geom_parallel_slopes()` to add regression lines to the plot
+-   interpret the plot - does it suggest that gender explains the link between height and income?
+-   add gender to the regression model and interpret the outcome
+-   (extension: try `+ geom_smooth(method = "lm")` instead of `+ moderndive::geom_parallel_slopes()` - what is the difference between the two plots? What different assumption does it represent?)
+
+```{r}
+ess <- read_rds(url("http://empower-training.de/Gold/round7.RDS"))
+ess_UK_typical_growth <- ess %>% filter(cntry == "GB", height >= 147)
+
+pacman::p_load(moderndive)
+
+ggplot(ess_UK_typical_growth, aes(x=height, y=hinctnta, col = gndr)) + geom_jitter(alpha=.1, width = 0, height=0.25) + labs(x = "Height in cm", "Household income (category)") + moderndive::geom_parallel_slopes()
+
+lm(hinctnta ~ height + gndr, data = ess_UK_typical_growth) %>% summary()
+
+```
+
+*Report your result in full sentences. Do they answer the original question? If not, how might you explain them?* We tested whether the association between height and household income might be explained by gender differences, specifically the fact that women are typically shorter than men and also earn less. Surprisingly, a multiple linear regression model showed that women report a higher household income than men (when controlling for height), *p* = .026, while the relationship between height and household income remains positive and significant when controlling for gender, *p* < .001. This finding might be influenced by the fact that we measured household rather than individual income.
+
+*What would you need to answer the original question?* It would be beneficial to have individual rather than only household incomes, or alternatively to compare singles living alone, where household income should be equivalent to their invidual income.
+
+## Wrapping up
+
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting \# in front of them.

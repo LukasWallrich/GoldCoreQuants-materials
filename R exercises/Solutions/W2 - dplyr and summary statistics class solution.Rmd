@@ -1,0 +1,111 @@
+---
+title: "Core Quants Week 2 Class"
+author: "YOUR NAME"
+date: "21/11/2019"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+#Some descriptive statistics and dplyr pipes
+
+___ indicates that you need to fill a gap there
+
+## Central tendency
+
+```{r setup, include=FALSE}
+#load required packages
+library(tidyverse) #included dplyr and ggplot2
+library(dslabs)
+```
+
+```{r}
+#You again have the gapminder dataset available. Let's add gdpPerCap (roughly average income per person)
+
+gapminder <- gapminder %>% mutate(gdpPerCap = gdp/population)
+
+#Let's look at the year 2010.
+gapminder2010 <- gapminder %>% filter(year == 2010)
+
+#Let's find the mean life_expectancy in the dataset
+
+mean(gapminder2010$life_expectancy, na.rm = TRUE) #na.rm: remove missing values, fails otherwise
+
+#Let's find the mean and median gdpPerCap
+mean(gapminder2010$gdpPerCap, na.rm = TRUE)
+median(gapminder2010$gdpPerCap, na.rm = TRUE)
+
+```
+
+### Interpreting mean and median
+
+The **mean** is the numerical average of gdp per capita, and thus indicates the hypothetical amount of production per person. However, it does not take inequality into account. The median gives the gdp per capita in the middle of the distribution and thus arguably better describes a typical country - however, they are most interesting when taken together, because we can then see that the mean is higher than the median, which indicates that some very rich countries pull the average up.
+
+```{r}
+#Mode: what is the most frequent region?
+#Use the dplyr verbs count() to get the number per region and arrange(desc()) to sort that with the highest number on top 
+
+# NOTE that you need to arrange by the number of countries rather than the region - so by the variable created by count. You can figure out what it is either by looking at the output, or by looking at the help (?count in the console). By default it is n.
+gapminder2010 %>% count(region) %>% arrange(desc(n))
+
+# But you can also rename it, to make the output clearer
+gapminder2010 %>% count(region, name = "number_of_countries") %>% arrange(desc(number_of_countries))
+
+```
+
+## Measures of dispersion
+
+These are more interesting per continent. So let's build something like the example in the video
+
+```{r}
+#Calculate SD and range for life_expectancy and gdpPerCap per continent: group_by continent, then select the two variables we are interested in, then summarise_all with list(sd, range_diff)
+
+#Here a problem comes up: range() does not return the range but the minimum and maximum. One solution is to create our own function, which we will not cover in detail, but this is how it would work
+range_diff <- function (x, ...) {diff(range(x, ...))}
+
+gapminder2010 %>%  group_by(continent) %>% 
+  select(life_expectancy, gdpPerCap) %>% 
+    summarise_all(list(sd, range_diff), na.rm = TRUE)
+
+
+#In the output, we now don't see what the values actually are - so let's run this again and name the functions by using list(sd = stdDev, range = range_diff) or any other names you might like
+gapminder2010 %>%  group_by(continent) %>% 
+  select(life_expectancy, gdpPerCap) %>% 
+    summarise_all(list(stdDev = sd, range = range_diff), na.rm = TRUE)
+
+#Note: The column names are now too long to be fully shown on a small screen - you can rename variables in the select command to fix that
+gapminder2010 %>%  group_by(continent) %>% 
+  select(lifeExp = life_expectancy, inc = gdpPerCap) %>% 
+    summarise_all(list(stdDev = sd, range = range_diff), na.rm = TRUE)
+
+#summarise_all is quite complicated but efficient. Alternatively, you can just use summarise and type out everything you want. In that case, you don't need select, since only the specified variables will be used
+gapminder2010 %>%  group_by(continent) %>% 
+    summarise(life_expectancy_sd = sd(life_expectancy, na.rm = TRUE),
+              life_expectancy_range = range_diff(life_expectancy, na.rm = TRUE), 
+              gdpPerCap_sd = sd(gdpPerCap, na.rm = TRUE), 
+              gdpPerCap_range = range_diff(gdpPerCap, na.rm = TRUE))
+
+#Which continent has the largest/smallest dispersion in life_expectancy and gdpPerCap?
+## Life expectancy: smallest: Europe // largest: Americas
+## GDP per capita: smallest: Africa // largest: Europe
+
+#What causes the large range of life expectancies in the Americas? Hint: filter() the data set by continent to only retain countries in the Americas, then arrange() it by life_expectancy
+gapminder2010 %>% filter(continent == "Americas") %>% 
+  select(country, life_expectancy) %>% arrange(life_expectancy) %>% head(n = 3)
+gapminder2010 %>% filter(continent == "Americas") %>% 
+  select(country, life_expectancy) %>% arrange(life_expectancy) %>% tail(n = 3)
+# Note that I minimise the output here. That is generally a good idea, so that the reader can see quickly what you deem relevant rather than having to make sense of the full dataframe.
+
+```
+
+The wide range of life expectancies in the Americas is driven by the very low reported life expectancy for Haiti. This is likely due to the earthquake in 2010. To test whether that is true, we can look at the life expectancy there in the years just before and after - which indicates that before any analyses, we should adjust that value to reduce the influence of that one-off event.
+
+```{r}
+gapminder %>% filter(country == "Haiti", year %in% c(2008, 2009, 2010, 2011, 2012)) %>% select(country, year, life_expectancy)
+```
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

@@ -1,0 +1,230 @@
+---
+title: "Core Quants Week 8 classwork"
+author: "YOUR NAME"
+date: "16/01/2020"
+output: html_document
+---
+
+# Some power calculation (essential)
+
+For this, you need to install the pwr-package.
+
+```{r}
+#Run install.packages("pwr") one in your console
+library(pwr)
+
+#The package has a good vignette explaining it - 
+#run vignette("pwr-vignette") or search it on Google
+
+#You want to know whether undergraduates drink more than postgraduates. How many you need to sample to have 80% power to detect an effect if the true means are .3 SD aparts (d = .3). Have a look at the type argument and set if, even if the default might be appropriate in this case. Report your result in a simple sentence below.
+pwr.t.test(____, type = "____") #sig.level is set to .05 by default
+
+#You want to test whether the share of immigrants in their neighbourhood explains variation in people's level of generalised social trust. You have a sample of 100 people. How high is your power to detect a correlation that explains at least 10% of the variance in the outcome? Would that sample size be considered large enough if you are looking for an effect of this size? (If you don't remember how to get to the correlation value, take r = .5 instead - that is not the correct answer, but allows you to test your code)
+pwr.r.test(_______)
+
+```
+
+# Party vote and anti-immigrant attitudes (essential)
+
+We might expect that voters for different parties have different attitudes towards immigrants. But which groups of voters actually differ from each other? Let's have another look at the ESS data and think about planned comparisons.
+
+```{r}
+library(tidyverse)
+#Note: this is a different dataset - not the health-focused one
+ess <- read_rds(url("http://empower-training.de/Gold/round7b.RDS"))
+
+#Add a new variable to the dataset that contains their attitude towards immigrants, consisting of imtcjob, imbleco, imwbcrm. Use psych::alpha to check whether the scale is consistent, and ideally also to get the scores (see above)
+scale_data <- ess %>% select(imtcjob, imbleco, imwbcrm) %>%
+    psych::alpha()
+
+#Get Cronbach's alpha from the scale_data object
+______
+
+#Get scale scores from the scale_data object - then assign to a new imm_att variable in the ess dataset 
+ess$imm_att <- _____
+
+#Filter data to only include UK respondents and turn the party choice variable (prtvtbgb) into a factor, using mutate and as_factor(). as_factor() turns the labelled number read from SPSS files into a factor, and thus makes the party names visible
+ess_UK <- ______
+
+#Check how many voters you have for each party. The dplyr count() verb counts how often each answer choice occurs, 
+ess_UK %>% count(____) 
+
+#Which pairwise comparisons between parties are you interested in, based on your hypotheses and the sample sizes you have? How many? What is the resulting Bonferroni-adjusted alpha level?
+
+ess_UK_filtered <- ess_UK %>% filter(party_choice %in% c("_____", "_____", "_____", "__ ..."))
+
+#Run an omnibus test on the full data to see whether party choice is associated with anti-immigrant attitudes (if you only want the omnibus test, you can use anova() instead of summary())
+_____
+
+#Run the pairwise t-tests that you were interested in (i.e. run pairwise.t.test() on the filtered dataset), as well as the descriptive statistics you need to interpret the results; then report the results in a few clear sentences
+pairwise.t.test(_____, p.adjust.method = "bonferroni")
+
+______
+
+```
+
+Your result: _______
+
+
+# Exploring regional inequalities in health in the UK (recommended)
+
+On our map from last week, we have seen that UK regions differ in their self-reported health and the share of people with depression. However, we do not yet know if these differences are more than what we might expect just do to sampling error - so let's do some significance testing.
+
+## Prepare data and calculate descriptive statistics
+
+```{r}
+library(tidyverse)
+ess <- read_rds(url("http://empower-training.de/Gold/ess7_health.RDS"))
+
+#Recreate the depression scale. (Just run this code)
+#First, recreate the reversed variables
+ess <- ess %>% mutate(enjlf_rev = 5 - enjlf, wrhpp_rev = 5 - wrhpp)
+
+#Now calculate the scale score. Last week, you did this manually - now you can just run this function to get it done in one step (cumulative = TRUE indicates that the sum, rather than the mean, should be calculated)
+
+ess$depression_score <- ess %>% select(fltdpr, flteeff, slprl, wrhpp_rev, fltlnl, enjlf_rev, fltsd, cldgng) %>% psych::alpha(cumulative = TRUE) %>% magrittr::extract2("scores") 
+
+#Filter the ESS for UK data (remember that the code is "GB") and for respondents who reported a health_region (i.e. where is.na(health_region) == FALSE)
+ess_UK <- ess %>% filter(_______)
+
+#Calculate the mean depression score and its standard deviation for UK regions (health_region variable). Sort the results by the mean and have a look - do you expect any of the differences to be significant?
+_______
+
+#Calculate the same summary statistics for self-reported health (health variable). Again, do you expect any of the differences to be significant?
+______
+
+```
+
+## Calculate inferential statistics
+
+```{r}
+#Run omnibus tests for health ~ health_region and depression_score ~ health_region
+_______
+
+#For the variable that is significantly associated with the region, run post-hoc tests
+
+#First with the Bonferroni-correction, then interpret the results. Remember that p-values below .1 can sometimes be described as marginally significant.
+
+_____
+#Once without any adjustment to control for family-wise error rates. When would the use of these p-values be appropriate?
+pairwise.t.test(____, p.adjust.method = "none")
+
+#If you had planned to compare London to the other regions (and make no other comparisons), which of the comparisons would be significant? Remember that you can use the Bonferroni-correction to adjust the alpha-level instead of the individual p-values?
+____
+
+```
+
+# Explaining health inequalities in Europe 
+
+We looked at inequalities in health outcomes across Europe last week. Let us know see whether they can be explained by considering economic differences between the regions (GDP per capita and long-term unemployment). As a short-cut towards the complicated age weighting used in the articles, let's also consider whether the region's median age is associated with the health outcomes.
+
+## Revisiting (multiple) linear regression (recommended)
+
+Note that we cannot just add regional gdp per capita into a normal regression model with all the ESS respondents - since that variable is the same for many participants (i.e. measured at a different level), it would violate the assumption that observations are independent. Thus we would need to use a multilevel model, or to shift our analysis from the level of participants to the level of regions. We will do the latter here, just because it is easier.
+
+```{r}
+
+#Create a dataframe with the data by region (you can just run this)
+region_data <- ess %>%
+  group_by(health_region) %>%
+  summarise(across(c(health, depression_score, region_gdp_eurhab_2014, region_loun_pc_act_2014), mean, na.rm = T), N = n()) %>%
+  filter(N >= 50)
+
+#Create a scatterplot linking gdp-per-capita and self-reported health. Does it look like there is a relation? Does it look like a straight line? (You can add the linear regression line with + geom_smooth(method = "lm") but still need to think whether the straight-line assumptions looks reasonable)
+
+______
+
+#Create a scatterplot linking long-term unemployment and self-reported health. Does a straight-line seem sensible here? 
+_____
+
+#(Hint: if there are outliers that are too influential, a simple transformation might be to consider ranks - for that, just wrap the rank() function around your variable in ggplot or the lm function. Always use na.last = "keep" in that function unless you precisely know what you are doing. However, that, of course, drops a lot of information and changes the hypothesis we test - so in real projects, you should consider alternatives)
+
+#Run a linear regression model to test whether regional self-reported health is associated with regional GDP per capita and long-term unemployment. Consider the share of variance explained, 
+
+_____
+
+```
+
+## Visualising the association (optional)
+
+It would be interesting to show health inequalities and economic inequalities side-by-side, to highlight the association and to identify regions that deviate. 
+
+For that, run this first segment as is.
+
+```{r}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(maps, mapproj)
+
+geo_data <- read_rds(url("http://empower-training.de/Gold/geodata_for_ess7.RDS"))
+
+#We will merge the geodata to the ESS by region and country. For that, it helps to align variable names - the following line does this
+
+geo_data <- geo_data %>% rename(cntry = CNTR_CODE, health_region = NUTS_NAME)
+
+# create correct labels for the axes
+geo_labels <- tibble(
+  eastwest_breaks = seq(-10, 30, 10),
+  northsouth_breaks = c(seq(40, 70, 10), NA)
+)
+
+geo_labels <- geo_labels %>% mutate(
+  eastwest_labels = case_when(
+    eastwest_breaks < 0 ~ paste0(abs(eastwest_breaks), "° W"),
+    eastwest_breaks > 0 ~ paste0(eastwest_breaks, "° E"),
+    TRUE ~ paste0(eastwest_breaks, "°")
+  ),
+  northsouth_labels = paste0(northsouth_breaks, "° N")
+)
+
+```
+Now prepare and create your map
+
+```{r}
+#Decide on the economic index you want to use. I would suggest a combined economic rank - that is, rank them by gdp and long-term unemployment, reverse long-term unemployment, and then add the two ranks together and rank the result again. However, you could also choose to just rank one of them, or even avoid ranking and just plot the values - but then think about whether that makes the maps more or less comparable. In any case, make sure that high values in both maps represent the same kind of outcomes - good or bad.
+
+#For health, we could go back to showing the share of those in poor health - but that would require us to calculate new regional data. If you don't want to do that, feel free to just plot the means contained in region_data - but I would suggest ranking them to make sure both charts have the same scale and range - that wil make it easier to see associations.
+
+#In any case, drop rows that have missing values on either of these variables - otherwise, the ranks will be less comparable
+
+region_data <- region_data %>%
+  drop_na(____all variables you use_____) %>%
+  mutate(
+    economic_rank = _________,
+    health_rank = _________
+  )
+
+
+map_economics <- region_data %>%
+  #Join to geo_data (coordinates)
+  right_join(geo_data) %>%
+  ggplot(aes(x = long, y = lat, group = group, fill = economic_rank)) +
+  geom_polygon(color = "grey", size = .25) +
+  #Define map-projection
+  coord_map(xlim = c(-11, 30), ylim = c(35, 72), projection = "azequalarea") +
+  #Define fill colours and scale labels
+scale_fill_distiller(palette = "RdYlGn", na.value = "white") +
+  #Define labels for x- and y-axes
+  scale_x_continuous(breaks = geo_labels$eastwest_breaks, labels = geo_labels$eastwest_labels) +
+  scale_y_continuous(breaks = geo_labels$northsouth_breaks, labels = geo_labels$northsouth_labels) +
+    labs(x = "", y = "", fill = "_______", title = "______", subtitle = "_____", caption = "Source: ESS 2014")
+
+
+map_health <- # You can take 95% of the code for the map_economics - copy/paste it and think about what you need to change
+
+pacman::p_load(patchwork)
+
+#Note that the fill should have the same label if possible - then you will only get one legend for the two maps
+map_economics + map_health + plot_layout(guides = "collect")
+
+#Look for the small "Show in New Window" button at the top right of the chart - that will likely improve appearance a lot. 
+
+#Which countries/regions are particularly healthy compared to their economic status? Which under-perform most in that comparison? Report that in a sentence or two.
+
+```
+
+_______
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

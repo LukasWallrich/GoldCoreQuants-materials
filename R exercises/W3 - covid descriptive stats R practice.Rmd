@@ -1,0 +1,131 @@
+---
+title: "Core Quants Week 3 Class"
+author: "YOUR NAME"
+date: "03/12/2020"
+output: html_document
+---
+
+^The section above contains metadata for the document - make sure to enter your name for homework and exams.
+
+In this practice, we will look at Covid data on tests, cases and deaths from England. For that, you need to download the data (W3_Covid_data.csv) and ideally place this file and the data into the same folder.
+
+First let's load the required packages. That is done with the library function. We only need the tidyverse for now.
+
+```{r}
+____(_____)
+```
+
+
+# Load data
+
+You can find details on how to load data on our  [module notes page](https://lukaswallrich.github.io/GoldCoreQuants/importing-and-describing-data.html). However, for now you can just follow the instructions.
+
+```{r}
+# Load the data and save it in a dataframe called covid_data. To type the filename, you can press the Tab key with the cursor within the "" - then a list of files in the folder will appear. You can type part of the filename (e.g., W3) and then select from the list. col_types tells R what to do with each column - here, the first column should be read as text, then two columns skipped, then one read as a factor (categorical variable), and then five as numbers. You can leave that part exactly as is. 
+
+____ <- read_csv(file = "", col_types = "c--fnnnnn")
+covid_data <- read_csv(file = "W3_Covid_data.csv", col_types = "c--fnnnnn")
+
+# Now we need to turn the first column into a date - the lubridate package (part of the tidyverse, but not loaded automatically) makes that quite easy, with functions designed to accommodate most possible ordering. Here the date is given as day/month/year, so that the dmy() function will work - just run the following line as is (with the ::, we can access a single function from a package without loading the entire package)
+
+covid_data <- covid_data %>% mutate(date = lubridate::dmy(date))
+
+```
+
+
+# Prepare and explore data
+
+```{r}
+#Use glimpse() to have a look at the dataframe (if you run it here, the output will be below this chunk, so you can also run it in the Console, but then remember to copy the code in below). 
+____
+
+#What does each row represent? Keep that in mind for the future analyses.
+
+# We should know what timespan the data covers. For that, use range() on the date
+
+____
+
+# Then we might wonder what regions are covered. You can use the dplyr function count() to count how often each unique value occurs, which is also a quick way to see the unique values
+
+____ %>% count(_____)
+
+# We might want to refer to population sizes in later analyses. At the moment, population is not included in the data, but we can calculate it. We have the cumulative number of cases per 100k and the total cumulative number of cases. Population is calculated as follows, but you need to create the dplyr mutate syntax around it
+
+____ <- _____ %>% ______(population = cumCasesBySpecimenDate/cumCasesBySpecimenDateRate*100000)
+
+covid_data <- covid_data %>% mutate(population = cumCasesBySpecimenDate/cumCasesBySpecimenDateRate*100000)
+
+# After such a calculation, it is always a good idea to sense-check the results. What population of England does this indicate for the first of December? (I.e. filter for the first of December, then sum up the population across all rows, using the summarise() function). If you get a result close to 56mn, then this method probably works well enough.
+
+___ %>% ____(date == "2020-12-01") %>% ______(____(_____))
+
+
+```
+
+
+# Summary statistics for the whole UK
+
+Note that there is a lot of missing data in this dataset, mostly for the months before Covid arrived to the UK. Therefore, most functions will fail to calculate summary statistics. Include na.rm = TRUE in the calls to mean(), sd(), sum() etc to get them to ignore the missing values.
+
+```{r}
+
+# How many tests have been carried out to date? (NOTE: You cannot answer this with the current dataset that is split by region. That data is missing. Unfortunately, PHE does not seem to publish this by region. In case you want to have a go at exploring this data for the UK as a whole, you can download it here: https://coronavirus.data.gov.uk/details/download
+
+# How many cases have there been?
+___
+
+# How many deaths have there been?
+___
+
+# What is the total case fatality rate? (I.e. share of cases that end in death?)
+___
+
+```
+
+
+# Summary statistics by region
+
+```{r}
+# How many cases have been in each region? Use dplyr group_by() and then summarise(). Name the outputs within summarise, e.g., summarise(cases = sum(newCasesByPublishDate))
+
+____
+
+# What is the case fatality rate per region? 
+
+____
+
+# How many death per 100,000 population have there been per region. (Hint: divide by mean(population, trim = 0.2) to reduce rounding errors in our population estimation, which happened at the start when there were very few cases). Arrange your results to be shown with the highest number of deaths at the to, using arrange(desc(____))
+
+___
+
+# What is the average of the total number of cases per region? Calculate both mean and median, as well as the standard deviation. Hint: you will need to summarise twice for this, first by region, then overall. What is the different interpretation between mean and median?
+
+____
+
+
+```
+
+
+# Changes over time
+
+Let's see if we can create something like the familiar curves and add our thoughts about the importance of the number of tests 
+
+```{r}
+# First, let's calculate the number of cases and deaths / 100k population. This can all be done in one mutate call.
+______
+
+# Let's plot each of these against time by region. For that, you need to use something like the following - replace everything in capital letters:
+
+ggplot(DATA, aes(x = X_AXIS_VAR, y = Y_AXI_VAR, color = GROUPS)) + geom_line() + labs(title = "TITLE", x = "X", y = "Y", color = "GROUPS")
+
+```
+
+
+
+
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

@@ -1,0 +1,118 @@
+---
+title: "Core Quants Week 11 classwork"
+author: "YOUR NAME"
+date: "25/02/2021"
+output: html_document
+---
+
+# Going back to UK general election results
+
+I downloaded some data on the General Election 2019 results and on each constituency from the Library of Parliament webpage. Let's explore a couple more relationships between categorical variables. The section below just reads and prepares the data - nothing for you to edit, but have a look to make sure you understand what is going on.
+
+```{r}
+library(tidyverse)
+constituencies <- read_csv(url("http://empower-training.de/Gold/ConstituencyData2019.csv"), col_types = "_cfddddfffddddfffdfdddd")
+
+#Some data is missing - this is now shown as parsing failures. Feel free to ignore that - if using your own data, you would need to check again what is going on.
+
+#Excluding Northern Ireland due to different party landscape and creating new "nation" variable to show whether constituence is in England, Wales or Scotland
+constituencies <- constituencies %>% filter(RegionName != "Northern Ireland") %>%
+          mutate(nation = case_when(RegionName == "Scotland" ~ "Scotland",
+                                    RegionName == "Wales" ~ "Wales",
+                                    T ~ "England"))
+
+#Exclude Chorley - the Speaker's constituency, which is a weird case with no Con candidate
+constituencies <- constituencies %>% filter(ConstituencyName != "Chorley")
+
+```
+
+Have a look at the dataset to see what variables are included - you can use glimpse() in the console for that.
+
+## Do incumbents have better chances to hold the seat for the party?
+
+```{r}
+#The table() function gives you a crosstabs (a table with the counts per cell, as used in the video). Use that to count how many constituents with incumbents running were held (and how many cases were in each of the other cells) - that is the ElectionChange variable.
+
+table(___, ___)
+
+#You can save the table and then use the prop.table() function to get shares - or pipe the result of table() into prop.table(). If you want the percentages not as part of the total but rather as a share of each column or row, which is generally more useful, you need to set the margin argument to 1 for rows or to 2 for columns. You can multiply the result by 100 if you want percentages. So, create a table that lets you see whether a greater share of incumbents wins, compared to holds by a new candidate.
+
+table(_____) %>% prop.table(_____)
+
+#Does there seem to be a substantial difference? Use the chisq.test() function to test whether any difference you observe is statistically significant.
+
+chisq.test(_______, ____________)
+
+#Turn off the continuity correction and instead request permuted p-values. You can use ?chisq.test to look up the names of the parameters.
+
+chisq.test(_____, _______, ______ = FALSE, ______ = TRUE)
+
+#What is your conclusion? Are incumbents more likely to win elections?
+
+#How much more likely is it for a constituency to be flipped when the incumbent is not running than when the incumbent is running? I.e. what is the odds ratio? (Calculate it manually as shown in the video, or look up a dedicated function if you prefer)
+
+OR <- (___/___) / (____/___)
+OR
+
+```
+
+## How do female candidates do?
+
+Was there a difference in how female candidates fared between the parties? I.e. is the winner's gender associated with the winning party?
+
+```{r}
+
+#Again, calculate the crosstabs - i.e. the count of winning candidates by party (ElectionWon) and gender (WinnerGender).
+_____
+
+#Currently, ElectionWon (the variable containing the party that won the election) is a factor that has levels for all parties that won anywhere, including the Speaker and the Northern Irish parties that we filtered out. To get rid of empty lines, use the droplevels() function
+constituencies$ElectionWon <- droplevels(constituencies$ElectionWon)
+
+#Use prop.table() to identify which party had the highest share of female winners? Which parties stand out to you?
+_____
+
+#Use chisq.test() to test whether there was a significant relationship between the two variables? Given the very small number of cases in some of the boxes, make sure to simulate the p-value. (Others would recommend that you exclude the small parties first.)
+___
+
+#Use post-hoc tests from the chisq.posthoc.test package. You could install that package first using install.packages() and then load it with library(). If you have the pacman-package installed, the line below combines the two steps. Finally, the chisq.posthoc.test needs the input as a table, generated with the table function(). Again, set simulate.p.value = TRUE
+pacman::p_load("chisq.posthoc.test")
+table(____) %>% chisq.posthoc.test(simulate.p.value = TRUE)
+
+
+#Are you surprised by the result for the LibDems? Would you have found a significant result if you had only asked the question whether the LibDems differed from other parties with regard to the gender of their winning candidates? Hint: you need to set method = "none" in the chisq.posthoc.test command, and try to remember why that matters.
+table(____) %>% chisq.posthoc.test(_____)
+
+#Advanced: How many comparisons does the test adjust for? How many does it need to adjust for?
+
+```
+
+## Testing goodness of fit - Benford's law to detect election fraud?
+
+It has been suggested that Benford's law can be used to detect election fraud. This law suggest that the first digits of various sets of numbers follow a specific distribution - which could be applied to the majorities in constituencies. Let's see if this pattern fits the UK election results
+
+However, note that this is certainly not a conclusive test and should probably not be applied to election data - see this [fact-check](https://www.reuters.com/article/uk-factcheck-benford-idUSKBN27Q3AI) of claims that Benford's law 'proves' that there was fraud in the 2020 US election.
+
+```{r}
+
+#Get first digit of the majorities (ElectionMaj) - you can use str_sub(x,1,1) to extract the first letter of x, then you need to use as.numeric to turn it into a number again.
+FirstNum <- str_sub(_____, 1, 1) %>% as.numeric()
+
+#Create a histogram to see what the distribution looks like
+#ggplot needs dataframes - I have worked directly with a single variable here.
+hist(FirstNum)
+
+#These are the probabilities of the different first digits from 1 to 9 proposed by Benford's law. Due to rounding, this does not add up exactly to 1, so you will need to set the rescale.p argument in chisq.test to TRUE
+probs <- c(0.301, 0.176, 0.125, 0.097, 0.079, 0.067, 0.058, 0.051, 0.046)
+
+#Run the chisq.test with given proportions (p = props) to see whether the majorities follow that distribution. In this case, it needs table(FirstNum) as the data argument.
+chisq.test(____)
+
+#Does this distribution follow Benford's law? If not, what (probabilistic) conclusion would you draw?
+
+```
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

@@ -1,0 +1,186 @@
+---
+title: "Core Quants Week 6 classwork"
+author: "YOUR NAME"
+date: "16/01/2020"
+output: html_document
+---
+
+# Exploring correlations in the ESS (European Social Survey) data
+
+The [ESS](https://europeansocialsurvey.org/) is a huge survey run every two years across Europe, focusing on different social and political attitudes, as well as personal characteristics. Here we use Wave 7 from 2014, which collected 601 variables on 40,185 respondents. Today we will mostly focus on some simple correlation and regression examples for the UK; in the next few weeks, we will explore European's life satisfaction and attitudes towards immigration in some more depth.
+
+If you are ever confused about how a variable is measured, or would like to see exactly what question was asked, you can have a look at the [codebook](https://www.europeansocialsurvey.org/docs/round7/survey/ESS7_appendix_a7_e01_0.pdf).
+
+# Loading ESS data and filtering for the UK
+
+I have selected a smaller set of 81 variables that we will look at over the next few weeks. I have saved the data as an RDS object - a R data type - and you can download it directly from the web by running the following code.
+
+```{r}
+library(tidyverse)
+
+ess <- read_rds(url("http://empower-training.de/Gold/round7.RDS"))
+#If that fails, your computer likely does not allow R to access the internet - then use the link to download the file and replace the URL by the local file path.
+
+#Create a new variable that filters for only the UK data (note: UK is coded as "GB")
+ess_UK <- ess %>% filter(cntry == "GB")
+
+```
+
+# Correlating height and weight
+
+One of the standard examples for correlations is weight and height - which are included in the ESS. Let's have a look. (*Note*: respondents' weight is in the `weight` variable - `dweight` and `pweight` are something else; ignore them for today.)
+
+### Data preparation and exploration
+
+```{r}
+#Produce a scatterplot of the association of weight and height for the UK ESS data
+ggplot(ess_UK, aes(x=height, y=weight)) + geom_point()
+
+#Given the large sample size, many points are now just plotted on top of each other. Create another scatterplot and make them transparent by adding alpha=.2 as an attribute to the geom_point() function to see more clearly where the majority of points are.
+ggplot(ess_UK, aes(x=height, y=weight)) + geom_point(alpha=.2)
+
+#Are there any outliers? Do you think they are plausible values?
+#In any case, it might be sensible to exclude people with restricted growth from this analysis as the correlation would probably differ for them. Restricted growth is defined as people shorter than 147cm (https://www.lpaonline.org/faq-#Definition). So let's filter them out.
+ess_UK_typ_growth <- ess_UK %>% filter(height >= 147)
+  
+#Create a new scatterplot and add the straight line of best fit, using geom_smooth() with the method="lm" argument to get a straight line and the se = FALSE argument to turn off highlighting the standard errors - that is the "regression line"
+
+#Label the chart appropriate, including units of measurement and the data source
+
+ggplot(ess_UK_typ_growth, aes(x=height, y=weight)) + geom_point(alpha=.1) + geom_smooth(method="lm", se = FALSE) + labs(title = "Correlation between height and weight in the UK population", caption = "Source: ESS 2014, excludes respondents with restricted growth", x="Height (cm)", y="Weight (kg)")
+
+
+
+```
+
+### Calculating regression and correlation
+
+```{r}
+#Run the lm() function to calculate the parameters for that line. Remember that the syntax is lm(DV ~ IV, data = ____). What do the parameters mean? Specifically, what difference in weight is associated with an increase in height of 1cm?
+lm(weight ~ height, data = ess_UK_typ_growth)
+
+#Pipe the output of your lm() function into the summary() function to get more details. Is the relationship statistically significant? What share of the variance in weight is explained by variance in height?
+lm(weight ~ height, data = ess_UK_typ_growth) %>% summary()
+
+#Run the cor.test() function to get the standardized correlation coefficient. The syntax here is cor.test(data$x, data$y). Remember that you can use na.rm = TRUE if you have problems with missing data.  What does the result mean?
+cor.test(ess_UK_typ_growth$height, ess_UK_typ_growth$weight)
+
+```
+
+*Report* your main results in a few clear sentences:
+
+We analysed the relationship between British adults' weight and height as reported in the 2014 European Social Survey, including only respondents who did not show restricted growth (i.e. at least 147 cm tall, *N* = 2,215). There was a strong positive correlation between the two measures, with *r* = .53, *p* \< .001. (Or, based on the regression results: There was a significant relationship between weight and height, with each additional centimeter in height associated with an increase of 0.87kg in weight, *F*(1, 2,108) = 815.5, *R*\^2 = .28, *p* \< .001).
+
+# Correlating height and income
+
+That height and weight are linked is not surprising - but what about height and income? (We only have household income in this dataset, so we have to take that as an indicator for personal income. Also, **let's stick to the filtered dataset of respondents with typical growth** for now.)
+
+Household income is saved in the `hinctnta` variable. It is not continuous, but measured on a 10-point scale, with higher numbers indicating greater income.
+
+### Data exploration
+
+```{r}
+
+#Create a scatterplot of height and household income in the UK. Make the points semi-transparent again to deal with overplotting.
+ggplot(ess_UK_typ_growth, aes(x=height, y=hinctnta)) + geom_point(alpha = .2) 
+
+#Advanced: Household income is not continuous, but measured on a 10-point scale - that leads to a lot of overlap of the points. One way to deal with that is to add some vertical random noise to the points - geom_jitter() is like geom_point() with that addition
+ggplot(ess_UK_typ_growth, aes(x=height, y=hinctnta)) + geom_jitter(alpha=.1, width = 0, height=0.25)
+
+#Does there seem to be a relationship? Does it look like something that is definitely not a straight line? Otherwise, fit the regression line with geom_smooth()
+ggplot(ess_UK_typ_growth, aes(x=height, y=hinctnta)) + geom_jitter(alpha=.1, width = 0, height=0.25) + geom_smooth(method = "lm", se = FALSE)
+
+```
+
+### Calculation regression and correlation
+
+```{r}
+
+#Use lm to calculate the regression coefficient that links height with income. What does that coefficient mean?
+lm(hinctnta ~ height, ess_UK_typ_growth)
+
+#Use the summary function to check whether that result is significant.
+lm(hinctnta ~ height, ess_UK_typ_growth) %>% summary()
+
+
+#Can you compare that with the regression coefficient above? What are the units of the numbers? 
+
+#The correlation coefficient is exactly made for such comparisons. Calculate the correlation coefficient and check whether height is a better predictor of weight or of income?
+cor.test(ess_UK_typ_growth$hinctnta, ess_UK_typ_growth$height)
+
+
+```
+
+*Again, report your result in 1-2 clear sentences:*
+
+Among British adults, there was a significant positive correlation between height and household income, as measured on a 10-point scale, with *r* = .20, *p* \< .001. (Here, this makes more sense than the regression, given that the regression coefficient does not have meaningful units.)
+
+*What might explain this relationship? What might be confounding variables here?*
+
+Given that men are taller than women, on average, this effect might partly explained by gender. (Interestingly, it is not - if we control for gender in the regression equation, which we will learn about next week, the result does not change.) If the effect is real, it might be that tall people are (implicitly) perceived as stronger and more competent, giving them an edge in the labour market.
+
+*Note:* There really seems to be a positive relationship between height and earnings; this has led to the interesting suggestion that tall people should pay higher taxes: <https://www.nber.org/papers/w14976.pdf>
+
+# One final correlation: immigration estimates and immigration beliefs
+
+People are quite bad at estimating anything that goes beyond their direct everyday experience - see the fascinating [Perils of Perception](https://www.ipsos.com/ipsos-mori/en-uk/perils-perception-2018) studies by Ipsos Mori. This might be problematic, because people's estimates might be expected to affect judgments. So, how well do people in the UK estimate the share of immigrants (reported in the `noimbro`-variable)? And is that linked to whether they think that immigration is generally good or bad for the UK (reported in `imwbcnt`)?
+
+### Data exploration
+
+Remember to return to the full `ess_UK` dataset here - short people no longer need to be excluded.
+
+```{r}
+#Create a histogram of the noimbro variable, the estimated share of people born outside the UK. 13% of UK residents were actually born outside the UK in 2014; that line is added with geom_vline() as a point of reference. Do people generally overestimate or underestimate immigration?
+
+ggplot(ess_UK, aes(x=noimbro)) + geom_histogram() + geom_vline(xintercept=13, col="red")
+
+#What are the mean and median estimate? Remember that you might need to use na.rm = TRUE
+mean(ess_UK$noimbro, na.rm = TRUE)
+median(ess_UK$noimbro, na.rm = TRUE)
+
+#or there are various dplyr solutions, most simply
+ess_UK %>% 
+  summarise(mean(noimbro, na.rm = TRUE), median(noimbro, na.rm = TRUE))
+
+#What share of the population overestimates the number of immigrants? Remember that you can use the mean() function to get the share of TRUEs in the result of a logical comparison (e.g., mean(age<18) would give the share of underage respondents)
+
+mean(ess_UK$noimbro>13, na.rm = TRUE)
+
+#Is the estimate linked to opinions about immigration? Create a scatterplot of noimbro (the estimate of immigration) and imwbcnt (the judgement whether immigration is generally good or bad). Given that imwbcnt can again only take certain values, you might want to use geom_jitter.
+ggplot(ess_UK, aes(x=noimbro, y=imwbcnt)) + geom_jitter(alpha = .2)
+
+
+
+```
+
+*Report how people's perceptions correspond to reality, including an appropriate measure of the average estimate:*
+
+In the ESS 2014 data, 70.5% of respondents in the UK over-estimated the share of immigrants in the population. The median estimate was 25%, while immigrants make up 13% of the population.
+
+*Based on the scatterplot, do you expect to find a significant link between estimates of immigrant numbers and attitudes towards immigration?*
+
+There appears to be a weak negative link between the two variables, which would indicate that greater estimates of immigration go along with more negative assessments of immigration.
+
+### Calculating regression and correlation
+
+```{r}
+
+#Calculate the regression coefficient with the lm() function and pipe the result into the summary function. What change in the judgement about the effect of immigration is associated with a 1%-point increase in the estimate of the number of foreigners? Is the relationship significant?
+lm(imwbcnt ~ noimbro, ess_UK) %>% summary()
+
+#What is the standardised correlation coefficient?
+cor.test(ess_UK$noimbro, ess_UK$imwbcnt, na.rm = TRUE)
+
+#Advanced: clearly, noimbro is not normally distributed, so that outliers might distort our correlation coefficient and particularly the significance test. One way to deal with that is to calculate Spearman's rank order correlation coefficient that correlates the ranks rather than absolute values, and thus reduces the impact of outliers (as an example, 1, 3, 5, 100 would become 1, 2, 3, 4 before the calculation). To do that, you can run cor.test() with the method = "spearman" argument - run that and check whether it would affect our conclusion
+cor.test(ess_UK$noimbro, ess_UK$imwbcnt, na.rm = TRUE, method = "spearman")
+
+
+```
+
+*Again, report your results in a few sentences:*
+
+In the ESS 2014, respondents' estimates of the share of immigrants in the UK population were negatively correlated with their judgement whether immigration was generally good or bad for the country, *r* = -.29, *p* *\<* .001. Those who estimated that there were more immigrants in the country tended to judge immigration more negatively.
+
+## Wrapping up
+
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting \# in front of them.

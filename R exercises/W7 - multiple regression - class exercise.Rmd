@@ -1,0 +1,109 @@
+---
+title: "Core Quants Week 7 classwork"
+author: "YOUR NAME"
+date: "28/01/2021"
+output: html_document
+---
+
+# Exploring UK general election results
+
+I downloaded some data on the General Election 2019 results and on each constituency from the Library of Parliament webpage. Let's explore a couple more relationships. The section below just reads and prepares the data - nothing for you to edit, but have a look to make sure you understand what is going on.
+
+```{r}
+library(tidyverse)
+constituencies <- read_csv(url("http://empower-training.de/Gold/ConstituencyData2019.csv"), col_types = "_cfddddfffddddfffdfdddd")
+
+#Some data is missing - this is now shown as parsing failures. Feel free to ignore that - if using your own data, you would need to check again what is going on.
+
+#We exclude Northern Ireland due to the different party landscape and create new "nation" variable to show whether a constituency is in England, Wales or Scotland
+constituencies <- constituencies %>% 
+  filter(RegionName != "Northern Ireland") %>%
+          mutate(nation = case_when(RegionName == "Scotland" ~ "Scotland",
+                                    RegionName == "Wales" ~ "Wales",
+                                    T ~ "England"))
+
+#Exclude Chorley - the Speaker's constituency, which is a weird case with no Conservative (or other major party) candidate
+constituencies <- constituencies %>% filter(ConstituencyName != "Chorley")
+
+```
+
+Have a look at the dataset to see what variables are included. Develop at least one hypothesis you find interesting and would be able to test with linear regression. \_\_\_\_\_\_
+
+## Diversity and support for the Conservatives
+
+```{r}
+
+#There are two indicators in the dataset that might measure diversity - which are they? What are their units? There is a difference in how they are coded - fix that to make them more comparable.
+
+constituencies <- constituencies %>% mutate(_____ = ____ * 100)
+
+#Do they individually predict the conservative vote share? Check the scatterplots to see whether a linear relationship can be assumed. You might decide that you need to filter the data before proceeding.  
+ggplot(constituencies, aes(x= ______, y=ElectionConShare, col=nation)) + geom_point(alpha = .3)
+
+ggplot(constituencies, aes(x= ____, y=ElectionConShare, col=nation)) + geom_point(alpha = .3)
+
+_____ <- constituencies %>% filter(nation == "_____")
+
+#Run individual linear model (with lm()) to test whether they are significant predictors of the Conservative's vote share
+
+____
+____
+
+#What happens when you put them into the same model? Compare the R2 values to the values for the models with just one predictor to see how much unique variance each variable explains, and decide which is the more important predictor.
+
+lm(_____ ~ _____ + ______, _______) %>% summary()
+
+```
+
+Report your results in a couple of full sentences: \_\_\_\_\_
+
+## What is the link between turnout and the Conservative share?
+
+We can use multiple regression to control for variables that we know to influence the result, but that we are not interested in - often that will be some kind of baseline scores that vary between participants. For example, if we want to test how some factors affected the 2019 election in particular, it might be helpful to control for the 2017 result.
+
+```{r}
+#Run a simple linear model to test whether turnout predicts the conservative vote share. Is there a relationship? In what direction?
+lm(ElectionConShare ~ ______, constituencies) %>% summary()
+
+#Add ConShare2017 as a predictor to that model. What changes? How much unique variance is explained by 2019 turnout?
+____
+
+```
+
+## Extension activity: candidate gender and electoral success
+
+Just using the data given, how could you try to see whether candidate gender affected election outcomes? You might suggest an attempt for which we don't have a significant test yet, in that case, descriptive statistics are sufficient.
+
+```{r}
+
+```
+
+# Returning to the height vs income correlation
+
+Last week, we established that height predicts household income in the UK - I provide the code below. Now check whether the result is explained by the relationship between height and gender, in combination with the gender pay gap.
+
+For that,
+
+-   map gender (`gndr`) onto color in the plot aesthetics
+-   install the moderndive package (`library(moderndive)`) and use `+ moderndive::geom_parallel_slopes()` to add regression lines to the plot
+-   interpret the plot - does it suggest that gender explains the link between height and income?
+-   add gender to the regression model and interpret the outcome
+-   (extension: try `+ geom_smooth(method = "lm")` instead of `+ moderndive::geom_parallel_slopes()` - what is the difference between the two plots? What different assumption does it represent?)
+
+```{r}
+ess <- read_rds(url("http://empower-training.de/Gold/round7.RDS"))
+ess_UK_typical_growth <- ess %>% filter(cntry == "GB", height >= 147)
+
+ggplot(ess_UK_typical_growth, aes(x=height, y=hinctnta)) + geom_jitter(alpha=.1, width = 0, height=0.25) + labs(x = "Height in cm", "Household income (category)")
+
+lm(hinctnta ~ height, data = ess_UK_typical_growth) %>% summary()
+
+```
+
+Report your result in full sentences. Do they answer the original question? If not, how might you explain them? \_\_\_\_\_
+
+What would you need to answer the original question? \_\_\_\_\_
+
+## Wrapping up
+
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting \# in front of them.

@@ -1,0 +1,235 @@
+---
+title: "Core Quants Week 12 classwork"
+author: "YOUR NAME"
+date: "05/03/2020"
+output:
+  minidown::mini_document:
+    code_folding:
+      source: hide
+      output: show
+      message: hide
+      warning: hide
+      error: show
+---
+
+This week, I am hiding the code by default since you should focus on the interpretation of results. However, you can see all the code by clicking on the arrows (or alternatively, by looking at the Rmd file).
+
+```{r}
+library(tidyverse)
+library(interactions) #If you have not yet installed this package, you need to do so before loading it.
+library(car) #You might also need to install this
+```
+
+# Simpson's paradox and the importance of interactions
+
+Please test whether penguin's bill length is related to their bill depth (basically how wide it is). 
+
+```{r}
+penguins <- read_csv("https://raw.githubusercontent.com/allisonhorst/palmerpenguins/master/inst/extdata/penguins.csv")
+
+#Plot bill depth versus bill length and add a lm() regression line.
+#What is the relationship?
+ggplot(data = penguins, aes(x = bill_depth_mm, y = bill_length_mm)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("There appears to be a negative relationship ...")
+
+#Might this be different by species? Rerun the graph, now 
+#mapping species onto color. How does the interpretation change?
+ggplot(data = penguins, aes(x = bill_depth_mm, y = bill_length_mm, col=species)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  ggtitle("... but this masks positive relationships within each species")
+
+#Estimate a linear model that allows you to answer how bill length versus bill depth are related. Do you need a covariate? Do you need an interaction? 
+lm(bill_length_mm ~ bill_depth_mm * species, penguins) %>% summary()
+
+```
+*If you have a Gentoo penguin, how would you estimate their bill length given their bill depth? What about an Adelie penguin? Write out the two regression formulas and calculate the predicted bill length given a bill depth of 16mm*
+
+Gentoo: pred. bill length = 23.1 - 5.8 + (0.85+1.16) * bill depth  --> 16 mm would lead to a prediction of 49.5mm
+
+Adelie: pred. bill length = 23.1 + 0.85 * bill depth  --> 16 mm would lead to a prediction of 36.7mm
+
+# Is the climate becoming less stable?
+
+A while ago, we looked at weather data from Heathrow to consider whether April temperatures are a good guide to temperatures in the summer. For that, we ran two regression models - have a look at their output and interpret what you see. 
+
+```{r}
+weather <- read_csv("https://github.com/LukasWallrich/GoldCoreQuants-materials/raw/main/R%20exercises/data/heathrowdata-metoffice.csv")
+
+weather <- weather %>%
+  filter(mm %in% c(4, 8)) %>%
+  mutate(temperature_avg = (tmin + tmax) / 2) %>%
+  select(yyyy, mm, temperature_avg) %>%
+  pivot_wider(names_from = mm, values_from = temperature_avg) %>%
+  rename(April = `4`, August = `8`, year = yyyy)
+
+lm(August ~ April, weather) %>% summary()
+lm(August ~ April + year, weather) %>% summary()
+
+#Now include an interaction between April and year and interpret the result
+#Did the association between April and August change over time? How?
+model_int <- lm(August ~ April * year, weather) 
+summary(model_int)
+#What does the 'Estimate' for April refer to now? How could you recode the data to turn it into a more meaningful number?
+
+#A simple slopes interaction plot might help to visualise the relationship - but given that the moderator takes very specific and meaningful values, it makes little sense to use the normal lines based on standard deviations of the moderator. Instead, specify a couple of meaningful values of the moderator (year).
+interactions::interact_plot(model_int, "April", "year", modx.values = c(1950, 1975, 2000, 2020))
+
+#When did April temperatures stop being a significant predictor of August temperatures? (You need the johnson_neyman() interval to answer this.) What relationship does it suggest from 2020 on? Should we believe that?
+johnson_neyman(model_int, "April", "year")
+
+```
+
+We tested whether April temperatures in a given year would predict August temperatures in the same year. Considering temperatures measured at Heathrow from 1948 to 2019, we found that there was a significant (linear) interaction between April temperatures and the year in predicting August temperatures, B = -0.015, *p* = .005. Johnson-Neyman prediction intervals showed that while April temperatures were a significant positive predictor of August temperatures until 1975, the relationship has not been significant since.
+
+# Further examples (homework / independent practice)
+
+## Interaction between categorical predictors: alcohol and wellbeing in the ESS
+
+In this, we are considering the link between alcohol consumption and happiness in France and Germany, with the hypothesis that people who drink more are less happy, on average, but that this relationship might differ between countries. 
+
+Alcohol consumption is measured continuously in the ESS, but the data has a huge range with strong outliers and is likely not particularly reliable, since it is based on free recall. Therefore - and for demonstration purposes - I am recoding it into three equally-sized categories below - people who drink low, medium and high amounts - and finally the people who drink nothing. People who report having drunk "0" are excluded from this analysis - they are not the people who say that they don't drink (they are coded as missing here), so that it is unclear what that number means. In real research, that would of course need to be further explored/justified. If you are comfortable with dplyr, try to understand that code - otherwise, just run it and start your work in line 35.
+
+
+```{r}
+#Read the dataset
+ess <- read_rds(url("http://empower-training.de/Gold/round7.RDS"))
+
+#Create categorical drinking variable
+essF <- ess %>%
+  mutate(alctot = alcwkdy + alcwknd) %>%
+  filter(cntry %in% c("DE", "FR"), alctot > 0) %>%
+  group_by(cntry) %>%
+  arrange(alctot) %>%
+  rowid_to_column() %>%
+  mutate(alc_cat = cut(rowid, breaks = 3, labels = c("Low", "Medium", "High")))
+
+#Now fit a linear model predicting happiness (happy) from cntry and alc_cat. Make sure to include an interaction between the two variables.
+fit<-lm(happy ~ cntry * alc_cat, essF) 
+
+#Use car::Anova() with type=3 to test whether the variables are significant overall (i.e. combining all dummy variable combinations)
+car::Anova(fit, type=3)
+
+#Create a categorical interaction plot, with alcohol as the predictor and country as the moderator
+cat_plot(fit, pred="alc_cat", modx = "cntry", geom = "line")
+
+#To run pairwise t.tests, we now need to create a grouping variable that has the 9 (3*3) levels. For that, we can just paste() the two variables indicating country and drinking level together within mutate()
+essF <- essF %>% mutate(group = paste(alc_cat, cntry))
+
+#Now run pairwise.t.test() and check the following planned comparisons:
+#Whether there is a difference in happiness levels 
+# - between the 3 categories within each country and 
+# - between the levels of the same category across countries. 
+#Note: given that you are only interested in these planned rather than all comparisons, you cannot use any inbuilt p-value adjustment. Instead, decide on the Bonferroni-corrected alpha level, and set p.adjust.method = "none"
+
+pairwise.t.test(essF$happy, essF$group, p.adjust.method = "none")
+
+#If you save the ouput of pairwise.t.test() as x, then you can use the following code to adjust and round the p-values:
+x<-pairwise.t.test(essF$happy, essF$group, p.adjust.method = "none")
+x$p.value<-round(x$p.value*12, 3)
+#Note that they should never exceed 1
+x$p.value[x$p.value>1] <- 1
+x
+
+#For reporting, we would also need the means per group, which you can round in the summary as well
+essF %>%
+  group_by(cntry, alc_cat) %>%
+  summarise(round(mean(happy, na.rm = TRUE), 2))
+
+```
+
+*Try to report your results in a few sentences. Make sure to only refer to planned comparisons.* We tested whether alcohol consumption was related to self-reported happiness in Germany and France. There was a significant main effect of country, with Germans reporting higher happiness than the French, *F*(1, 4132) = 8.13, *p* = .004, but no main effect for alcohol consumption, *F*(1, 4132) = 1.48, *p* = .23. However, this was qualified by a significant interaction between country and alcohol consumptions, *F*(2, 4132) = 3.79, *p* = .023, which is shown in Figure x. After Bonferroni-adjustment for 12 planned comparisons, namely between the levels of alcohol consumption within each country and between each level across countries, we found some significant differences. Specifically, French respondents reported significantly lower life satisfaction than German respondents at high (*p* < .001) and medium (*p* < .001) levels of life satisfaction, but only marginally lower life satisfaction at low levels of alcohol consumption (*p* = .052). In both countries, there were no significant differences in life satisfaction between the levels of alcohol consumption (Germany: *p*s > .99, France: *p*s > .13). Means and standard deviations for each cell are shown in Table x. 
+
+**Note** that reporting interactions is rather difficult - including Figures and focusing on a subset of all possible pairwise comparisons is essential.
+
+## Interaction of continuous with categorical variable: Weathering the Storm
+
+This task uses the data from the article by Stout (2018) *Weathering the Storm: Conditional Effects of Natural Disasters on Retrospective Voting in Gubernatorial Elections—A Replication and Extension.* The key contribution of that article was to add an interaction term to a model that was previously published, in order to test how natural distasters in the 6 months running up to the election of a governor in a US state affect the share of the vote received by that governor.
+
+The key hypothesis was that while governors' reelection chances are usually hurt by natural disasters, they can actually increase their vote share if they are seen as responding effectively. This was operationalised as getting the president to declare a state of emergency, which unlocks additional funding for the affected region.
+
+
+```{r}
+#Download the dataset
+govdata <- read.csv("http://empower-training.de/Gold/WtS1970-2016Data.csv")
+
+#Filter the use the same used in the article
+d7006 <- govdata %>% filter(year<2007)
+
+#Run a linear model to predict the incumbents' vote share (inc.gov.twpct) from the damage caused by the disaster, the last presidential vote for the same party, the vote share of the governor in the last election, the median income, whether there was an economic turndown and whether an official state of emergency had been declared by the president (use the dideclaraton variable that is dichotomous, i.e. yes/no).
+
+vote_model <- lm(inc.gov.twpct ~ gr.damage + presvote + govvote.lag + median.inc.k + dideclaration +
+                turndown, data = d7006)
+
+#If the hypothesis is true, the effect of damage should depend on whether or not an emergency had been declared. So add an interaction between the damage and whether or not an emergency had been declared to the model
+
+vote_model_interaction <- lm(inc.gov.twpct ~ gr.damage*dideclaration + presvote + govvote.lag + median.inc.k + 
+                turndown, data = d7006)
+
+#Compare the summaries of the two models - what changed? Is the interaction significant? What do the coefficients for gr.damage and dideclaration in the second model mean? (Being able to answer these questions is at least as important as getting the code right!)
+
+#Use the anova() function to test whether the second model fits the data better than the first model. In this particular case (with only two categories and thus one interaction term), the p-value should look familiar - where else do you see it?
+anova(vote_model, vote_model_interaction)
+
+#Construct an interaction plot using the interact_plot() function from the interactions package
+interactions::interact_plot(vote_model_interaction, "gr.damage", "dideclaration")
+
+#Note: to replicate the article, you should include as.factor(fips) and as.factor(year) in the regression model to control for fixed effects of country and year - that makes it a bit slow to run and doesn't change the results substantively, so no need to do it here.
+
+```
+
+## Interaction of two continuous variables - ethnic conflict and elections
+
+Paul Collier popularised the idea that democracy is actually harmful for development when countries experience lots of ethnic or religious conflict (see his Wars, Guns and Votes book). Actually testing this is hard, partly because it requires looking at the same countries at multiple timepoints, which requires dealing with repeated measures. To keep it simple, let's see if we can find the relationship he proposes in cross-sectional data. For that, we will use the Human Development Index - a combination of life expectancy, education and per capita income.
+
+```{r}
+#Download the dataset
+democracydata <- read_csv("http://empower-training.de/Gold/democracyData.csv")
+#In this dataset, the HDI (Human Development Index) comes from UNDP, while the data on elections and conflict come from the "The Global State of Democracy Indices"
+
+#Run a linear regression model predicting HDI in 2010 from group_conflict and elected_gov in 1990 WITHOUT an interaction
+#(both of these are scaled from 0 to 1 and effectively express ranks, group_conflict refers to both ethnic and religious conflict)
+lm(HDI_2010 ~ group_conflict_1990+elected_gov_1990, democracydata) %>% summary()
+
+#Run the same model with an interaction
+lm(HDI_2010 ~ group_conflict_1990*elected_gov_1990, democracydata) %>% summary()
+
+#Is the interaction significant? What do the coefficients in the interaction mean?
+
+
+```
+
+In the way you have run the model, the coefficients outside the interaction term give you the slope of one variable when the value of the other variable is 0. Often, it might be more interesting to know its slope when the other variable is at its mean, especially when 0 is not a meaningful or even possible value. To get that value, you can center the variables before estimating the regression - that just means substracting the mean from each value. The easiest way to do that is to wrap each variable into the `scale()` function with the `scale =` parameter set to FALSE (otherwise you get z-Scores) - so for example, `scale(group_conflict_1990, scale = FALSE)` would give you the centered scores for `group_conflict` in 1990.
+
+
+--> Estimate the same model again, this time centering the variables
+
+```{r}
+#The scale() function needs an extra parameter each time, and then adds extra attributes that will get you into trouble later on, so that you would need to strip them - one of the situations where you would run into trouble and then need to consult Google for help - this code works:
+democracydata <- democracydata %>% mutate(group_conflict_1990.c = c(scale(group_conflict_1990, scale=F)),elected_gov_1990.c = c(scale(elected_gov_1990, scale=F)))
+
+#In these situations, it can be worth writing a simple function to save yourself from the complications in the future (and to save some typing)
+center <- function(x) {c(scale(x, scale = FALSE))}
+
+democracydata <- democracydata %>% mutate(group_conflict_1990.c = center(group_conflict_1990), elected_gov_1990.c = center(elected_gov_1990))
+
+#Fit the new lm() model - what is the impact of elected governments at mean levels of group-based conflict and vice-versa?
+lm(HDI_2010 ~ group_conflict_1990.c*elected_gov_1990.c, democracydata) %>% summary()
+
+
+#Simple slope plots, however, are a lot clearer when you do not scale the variables. So go back to the earlier model and then make a simple slopes plot to show how the relationship between the extent to which government jobs are filled by elections (elected_gov) and HDI changes depending on the level of group-based conflict.
+fit <- lm(HDI_2010 ~ group_conflict_1990*elected_gov_1990, democracydata) 
+interact_plot(fit, pred = "elected_gov_1990", modx = "group_conflict_1990")
+sim_slopes(fit, pred = "elected_gov_1990", modx = "group_conflict_1990")
+
+#Use the Johnson-Neyman function to find out at what values of group_conflict elected government positively predicts future HDI. Are there values when it negatively predicts it?
+johnson_neyman(fit, pred = "elected_gov_1990", modx = "group_conflict_1990")
+
+#Note that the values where there is potentially a negative effect are outside the observed range - so it would be very risky to conclude anything about them (extrapolation). This might (sometimes) serve as inspiration for future research, but you would only report the significant and non-significant regions within the observed range as findings.
+
+
+```
+
+

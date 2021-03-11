@@ -1,0 +1,166 @@
+---
+title: "Core Quants Week 13 classwork"
+author: "YOUR NAME"
+date: "12/03/2020"
+output: 
+  minidown::mini_document:
+    code_folding:
+      source: hide
+      output: show
+      message: hide
+      warning: hide
+      error: show
+---
+
+Today is about thinking through the examples rather than getting R to work. Therefore, we will address them together, step by step.
+
+```{r}
+library(tidyverse)
+```
+
+
+# Predicting coronavirus cases using lm()
+
+Let's go back to the very start of the Covid-pandemic a year ago. Back then, people in many countries were worried about the virus being brought in by Chinese visitors. But was the number of Chinese tourists to OECD countries related to the number of Covid-19 cases.
+
+```{r}
+#Load data
+corona <- read_csv(url("https://github.com/LukasWallrich/GoldCoreQuants-materials/raw/main/R%20exercises/data/Chinese_tourists_and_covid19_cases_through_11032020.csv"))
+
+#Let's see if tourist numbers and cases appear linearly related
+ggplot(corona, aes(x = Tourists, y = Cases)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+#No need to fit this model, but just to check the plot
+fit <- lm(Cases ~ Tourists, corona)
+plot(fit, labels.id = corona$Country)
+
+#Given that diseases spread exponentially, we might expect that Tourists predict log(Cases) - better.
+ggplot(corona, aes(x = Tourists, y = log(Cases))) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+#Fit the model and look at diagnostic plots
+fit <- lm(log(Cases) ~ Tourists, corona)
+plot(fit, labels.id = corona$Country)
+#Look at plot 4. The key issue here is Japan - an outlier with lots of leverage. A good way to pull variables closer together and thereby reduce the impact of high outliers is a log transformation. Also log-log models are easier to interpret than one log only
+
+#So, let's see how log(Tourists) relate to log(Cases)
+ggplot(corona, aes(x = log(Tourists), y = log(Cases))) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+fit <- lm(log(Cases) ~ log(Tourists), corona)
+plot(fit, labels.id = corona$Country)
+#This looks better, no more outliers with high leverage. 
+
+#For further analysis, we can add the predicted values to the data and calculate the residual for each country
+corona <- corona %>% mutate(prediction = predict(fit), residual = log(Cases) - prediction)
+
+#The three strongest outliers (i.e. largest residuals are labeled in the plots)
+ggplot(corona, aes(x = log(Tourists), y = log(Cases))) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(data = corona %>% 
+              slice_max(abs(residual), n = 3), 
+            mapping = aes(label = Country))
+
+#They are Korea, Italy and Russia - Covid already spread locally in Korea and Italy, and Russia might not do enough testing (at least that has been argued based on such models) - so the most interesting result of that model are the outliers
+
+summary(fit)
+
+#How to interpret that correlation coefficient? They can now be interpreted as percentage changes. For each 1%-increase in the number of Chinese tourists, the number of Covid-19 cases is estimated to increase by 1.4%
+#If you want to understand why that is the right interpretation of the coefficients here, have a look at this video: https://www.youtube.com/watch?v=NZCSt9WkpkI
+
+```
+
+
+How to interpret the correlation coefficient in a log-log model? They now indicate percentage change: for each 1%-increase in the number of Chinese tourists, the number of Covid-19 cases is estimated to increase by 1.4%.
+
+If you want to understand why that is the right interpretation of the coefficients here, have a look at [this video](https://www.youtube.com/watch?v=NZCSt9WkpkI)
+
+
+# Testing another regression model
+
+Let's use R's inbuilt mtcars dataset - a set with the characteristics of 32 cars in 1974. Can we predict efficiency (mpg) based on weight, number of cylinders and horsepower?
+
+Let's inspect the model. What is the problem here?
+
+
+```{r}
+fit <- lm(mpg ~ cyl + hp + wt, mtcars)
+summary(fit)
+#A model with high R2 but two non-significant predictors - might be a problem with multicollinearity
+
+#Test whether predictors are highly correlated
+#All correlations rather high - especially cyl & hp.
+mtcars %>% select(hp, wt, cyl) %>% cor()
+
+#Can check Variance Inflation Factor with car::vif
+#standard error increased by sqrt(vif) - vif > 4 considered as worrying
+car::vif(fit)
+
+#Can we do with just wt as the only predictor
+fit2 <- lm(mpg ~ wt, mtcars)
+anova(fit,fit2)
+#No - significant difference between the models - that means that the model with more predictors explains greater share of variance (can use summary() and compare R2 to confirm)
+
+#Which of the other two is the better predictor - cyl or hp? Approach: add one, then see whether the model with both included is better
+fit3 <- lm(mpg ~ wt + hp, mtcars)
+anova(fit,fit3)
+
+fit4 <- lm(mpg ~ wt + cyl, mtcars)
+anova(fit,fit4)
+
+#Conclusion: either model with 2 predictors is not significantly worse than model with 3 predictors. So we have no simple way to choose between them - best would be to now decide based on theory which is the more relevant or interesting predictor.
+
+summary(fit4)
+#In either of the models, both predictors are now highly significant, which suggests that we had a multicollineary problem to start with.
+
+```
+
+# Mediation
+
+Are White British students who have a lot of contact with Black British people more likely to intervene when someone utters a racist slur? If so, why? This is an extract from a dataset from my research. 
+
+The variables you need are:
+
+- InteractBlack: Share of everyday interactions that are with Black people
+- AffBlack: negative emotions towards Black British people
+- BSSlurAct: strength of intention to intervene as bystander against racist slur
+
+You can use other variables to test different models.
+
+Run a linear model, then use psych::mediate to test for possible mediation.
+
+```{r}
+contact <- read_csv(url("http://empower-training.de/Gold/contactData.csv"))
+
+#Testing conditions for mediation
+## Predictor predicts outcome
+## NB: this is not strictly a condition - when might this not be needed?
+## Would not be needed when direct and indirect effect go in opposite direction - sometimes called 'suppression' rather than mediation 
+lm(BSSlurACT ~ InteractBlack, contact) %>% summary()
+
+## Mediator predicts outcome and weakens link between predictor and outcome when added to model
+## The actual condition would be "changes" rather than weakens the link - same reason as above.
+lm(BSSlurACT ~ InteractBlack + AffBLACK, contact) %>% summary()
+
+## Predictor predicts mediator
+lm(AffBLACK ~ InteractBlack, contact) %>% summary()
+
+# Test mediation using the mediate function from the psych package
+# Interpret the result - is the indirect effect significant?
+# You don't get a p-value - how can you decide?
+## Need to check whether confidence interval contains zero - 
+## here, it does not
+library(psych)
+mediate("BSSlurACT", "InteractBlack", "AffBLACK", contact)
+```
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

@@ -1,0 +1,129 @@
+---
+title: "Core Quants Week 13 classwork"
+author: "YOUR NAME"
+date: "12/03/2020"
+output: 
+  minidown::mini_document:
+    code_folding:
+      source: hide
+      output: show
+      message: hide
+      warning: hide
+      error: show
+---
+
+Today, the first two parts are about thinking through the examples rather than getting R to work. Therefore, we will address them together, step by step.
+
+```{r}
+library(tidyverse)
+```
+
+
+# Predicting coronavirus cases (in March 2020!) using lm()
+
+Let's go back to the very start of the Covid-pandemic a year ago. Back then, people in many countries were worried about the virus being brought in by Chinese visitors. But was the number of Chinese tourists to OECD countries related to the number of Covid-19 cases.
+
+```{r}
+#Load data
+corona <- read_csv(url("https://github.com/LukasWallrich/GoldCoreQuants-materials/raw/main/R%20exercises/data/Chinese_tourists_and_covid19_cases_through_11032020.csv"))
+
+#Let's see if tourist numbers and cases appear linearly related
+____
+
+#No need to fit this model, but just to check the plot
+fit <- lm(Cases ~ Tourists, corona)
+plot(fit, labels.id = corona$Country)
+
+#How might we improve fit? How are the variables related?
+
+
+#For further analysis, we can add the predicted values to the data and calculate the residual for each country
+corona <- corona %>% mutate(prediction = predict(fit), 
+                            residual = log(Cases) - prediction)
+
+#Let's label the strongest outliers in the plot
+______
+
+#And check for the regression coefficient
+_____
+
+
+```
+
+
+How to interpret the correlation coefficient in a log-log model? They now indicate percentage change: for each 1%-increase in the number of Chinese tourists, the number of Covid-19 cases is estimated to increase by 1.4%.
+
+If you want to understand why that is the right interpretation of the coefficients here, have a look at [this video](https://www.youtube.com/watch?v=NZCSt9WkpkI)
+
+
+# Testing another regression model
+
+Let's use R's inbuilt mtcars dataset - a set with the characteristics of 32 cars in 1974. Can we predict efficiency (mpg) based on weight, number of cylinders and horsepower?
+
+Let's inspect the model. What is the problem here?
+
+
+```{r}
+fit <- lm(mpg ~ cyl + hp + wt, mtcars)
+summary(fit)
+
+#Test whether predictors are highly correlated with the cor() function
+#All correlations rather high - especially cyl & hp.
+_____
+
+#Can check Variance Inflation Factor with car::vif
+#standard error increased by sqrt(vif) - vif > 4 considered as worrying
+_____
+
+#Can we do with just wt as the only predictor
+_____
+
+#Which of the other two is the better predictor - cyl or hp? Approach: add one, then see whether the model with both included is better
+____
+____
+
+#Conclusion?
+
+```
+
+# Mediation
+
+Are White British students who have a lot of contact with Black British people more likely to intervene when someone utters a racist slur? If so, why? This is an extract from a dataset from my research. 
+
+The variables you need are:
+
+- InteractBlack: Share of everyday interactions that are with Black people
+- AffBlack: negative emotions towards Black British people
+- BSSlurAct: strength of intention to intervene as bystander against racist slur
+
+You can use other variables to test different models.
+
+Run a linear model, then use psych::mediate to test for possible mediation.
+
+```{r}
+contact <- read_csv(url("http://empower-training.de/Gold/contactData.csv"))
+
+#Testing conditions for mediation
+## Predictor predicts outcome
+## NB: this is not strictly a condition - when might this not be needed?
+____
+
+## Mediator predicts outcome and 
+## weakens link between predictor and outcome when added to model
+____
+
+## Predictor predicts mediator
+____
+
+# Test mediation using the mediate function from the psych package
+# Interpret the result - is the indirect effect significant?
+# You don't get a p-value - how can you decide?
+____
+
+```
+
+
+## Wrapping up
+Click on Knit above to run all code and save the document as an HTML report that you can easily save and share. Note than you can only do that if all your code works without throwing an error - if there are just a few stubborn lines, you can always disable them for knitting by putting # in front of them.
+
+

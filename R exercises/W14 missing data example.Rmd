@@ -1,0 +1,95 @@
+---
+title: "Understanding missing data in gapminder"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Load packages and data
+
+```{r}
+#install.packages("naniar")
+library(naniar)
+library(dslabs) #for gapminder data
+library(tidyverse)
+```
+
+# Explore missing data
+
+We want to know how much data is missing, and what combinations of missing data are most frequent. Try out the following functions on gapminder and interpret what you see:
+- miss_var_summary
+- vis_miss with the argument sort_miss = TRUE
+- gg_miss_upset
+
+```{r}
+ggmiss
+```
+
+# Test associations
+
+We might expect that infant mortality is be missing more frequently in poor countries. If that is true, then data is not missing completely at random, so that we risk bias by deleting cases. So we should test that.
+
+```{r}
+#bind_shadow gives us variables that indicate missingness, needed for testing relationships
+#just run the following line, then check how gapminder changed (e.g., with glimpse)
+gapminder <- gapminder %>% bind_shadow(only_miss = TRUE)
+
+#We need gpd_per_capita
+gapminder <- gapminder %>% mutate(gdp_per_capita = gdp/population)
+
+#Now visualise whether gdp_per_capita differs depending on whether infant_mortality is missing
+#Try geom_boxplot and geom_jitter, and remember that alpha = .2 can be used to deal with overplotting
+_______
+
+#Surprisingly, it looks like the gdp per capita is higher in cases when infant mortality is missing. Is that difference significant?
+____
+
+#What countries are included in that list? Try to understand the following code, then run it and interpret the results
+gapminder %>%
+  filter(infant_mortality_NA == "NA", gdp_NA == "!NA") %>%
+  group_by(country) %>%
+  count()
+
+#If we weigh the analysis by population, we get the expected association
+#Can you understand what that means? 
+lm(gdp_per_capita ~ infant_mortality_NA, gapminder, weights = population) %>% summary()
+
+```
+
+# Developing an imputation model (not on the exam, just an illustration!)
+
+We need to develop a model that predicts infant mortality accurately and yields few implausible (e.g. negative) values. If we have time, we will go through this together live - note that these are only the first few steps
+
+```{r}
+# We could try predicting infant mortality from life expectancy. geom_miss_point() from naniar helps us to see in what range we would get imputations (the points along the x-axis are the ones we have missing values for on the y-variable).
+ggplot(gapminder, aes(x = life_expectancy, y = infant_mortality)) +
+  geom_smooth(method = "lm") +
+  geom_miss_point(alpha = .1)
+# This shows that we would get quite a few imputations below 0 - for the observations where infant mortality is missing, but life expectancy is above 78. That is not great and should be avoided. Maybe it can be avoided by using different slopes per continent.
+
+ggplot(gapminder, aes(x = life_expectancy, y = infant_mortality, colour = continent)) +
+  geom_smooth(method = "lm") +
+  geom_miss_point(alpha = .1, aes(shape = continent))
+# This makes it worse for Asia ... maybe we need to go for region, or consider gdp.
+```
+
+This shows that developing a good imputation model can take a while, which makes casewise deletion attractive in practice. If you use casewise deletion, at least make sure to report how much missing data you have and whether it can be assumed to be missing completely at random. 
+
+If we settle on an imputation model, we can use simputation to model it. Note that I run multiple models subsequently to use gdp_per_capita where it is available.
+
+
+```{r}
+library(simputation)
+gapminder <- gapminder %>%
+  impute_lm(infant_mortality ~ life_expectancy * region * log(gdp_per_capita)) %>%
+  impute_lm(infant_mortality ~ life_expectancy * region)
+
+# Let's check if the imputed values generally make sense
+ggplot(gapminder, aes(x = continent, y = infant_mortality, color = infant_mortality_NA)) +
+  geom_boxplot() +
+  geom_point(alpha = .1)
+```
+
+Something seriously went wrong in Oceania - so before proceeding, we would need to figure out what that is, adjust the model, and try the imputation again. A "quick fix" approach would be to set all negative imputed infant mortalities to 0 (or to the observed minimum), but that should only be done once all other information in the data is used. Enough for now.
+
+

@@ -1,0 +1,123 @@
+---
+title: "Understanding missing data in gapminder"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Load packages and data
+
+```{r}
+# install.packages("naniar")
+library(naniar)
+library(tidyverse)
+
+gapminder <- dslabs::gapminder #Get gapminder data from dslabs package
+```
+
+# Explore missing data
+
+We want to know how much data is missing, and what combinations of missing data are most frequent. Try out the following functions on gapminder and interpret what you see:
+- miss_var_summary
+- vis_miss with the argument sort_miss = TRUE
+- gg_miss_upset
+
+```{r}
+miss_var_summary(gapminder) #--> see that gdp and infant_mortality missing frequently, everything else looks fine
+
+
+vis_miss(gapminder, sort = TRUE) #--> see big chunk of missing data at the end of the dataset - given that data is sorted by year, that means in most recent observation. Could thus improve the data by adding 2016 gdp figures, or by ignoring 2016 - in any case, not missing MCAR!
+
+gg_miss_upset(gapminder) #--> gdp most frequently missing alone, infant_mortality most frequently together with gdp
+```
+
+# Test associations
+
+We might expect that infant mortality is be missing more frequently in poor countries. If that is true, then data is not missing completely at random, so that we risk bias by deleting cases. So we should test that.
+
+```{r}
+#bind_shadow gives us variables that indicate missingness, needed for testing relationships
+#just run the following line, then check how gapminder changed (e.g., with glimpse)
+gapminder <- gapminder %>% bind_shadow(only_miss = TRUE)
+
+#We need gpd_per_capita
+gapminder <- gapminder %>% mutate(gdp_per_capita = gdp/population)
+
+#Now visualise whether gdp_per_capita differs depending on whether infant_mortality is missing
+#Try geom_boxplot and geom_jitter, and remember that alpha can be used to deal with over-plotting - here, given that we have a lot of data, we need a very low alpha and need to put the boxplot on top - but then we should set fill = NA to be able to see the points below
+ggplot(gapminder, aes(x = infant_mortality_NA, y = gdp_per_capita)) +
+  geom_jitter(alpha = .05) +
+  geom_boxplot(color = "blue", fill = NA)
+
+#Surprisingly, it looks like the gdp per capita is higher in cases when infant mortality is missing. Is that difference significant? #--> Yes, with a large gap
+t.test(gdp_per_capita ~ infant_mortality_NA, gapminder)
+
+#What countries are included in that list? Try to understand the following code, then run it and interpret the results #--> mostly non-/semi-independent territories that might not collect their own statistics, might want to restrict analysis to independent countries
+gapminder %>%
+  filter(infant_mortality_NA == "NA", gdp_NA == "!NA") %>%
+  group_by(country) %>%
+  count() %>%
+  arrange(desc(n))
+
+#However, most territories with missing data are small - so we can also consider population to reduce the problem. Remember that 14% of cases had missing infant mortality - what share of the population is that? --> just 3.3%, so a much smaller issue when we take population into account
+#(We need to ignore the <2% of observations with missing population here)
+
+gapminder %>%
+  filter(!is.na(population)) %>%
+  summarise(pop_with_missing_infant_mortality =
+              weighted.mean(infant_mortality_NA == "NA", population))
+
+#Also, does the relationship change when we weigh the observations by population, i.e. when we consider whether the typical person living in a country without reported infant_mortality lives in a richer or poorer country than the typical person living in a country that reports it --> here we get the expected relationship between missing life_expectancy and lower gdp_per_capita
+
+lm(gdp_per_capita ~ infant_mortality_NA, gapminder, weights = population) %>%
+  summary()
+
+```
+
+# Developing an imputation model (not on the exam, just an illustration!)
+
+We need to develop a model that predicts infant mortality accurately and yields few implausible (e.g. negative) values. If we have time, we will go through this together live - note that these are only the first few steps
+
+```{r}
+# We could try predicting infant mortality from life expectancy. geom_miss_point() from naniar helps us to see in what range we would get imputations (the points along the x-axis are the ones we have missing values for on the y-variable) --> when you go up to the line from the red points, you see the imputed values you would get - main issue here is that we would get too many below zero, for life expectancies above 78, which are obviously impossible
+ggplot(gapminder, aes(x = life_expectancy, y = infant_mortality)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_miss_point(alpha = .1)
+
+# Maybe we can get more realistic values by considering continents? --> this makes it worse for Asia, so maybe region or so is better
+ggplot(gapminder, aes(x = life_expectancy, y = infant_mortality, 
+                      colour = continent)) +
+  geom_smooth(method = "lm", se = FALSE) +
+  geom_miss_point(alpha = .05, aes(shape = continent))
+
+# OPTIONAL EXTENSION: We could also recognise that the relationship won't be linear, but that the strength of the relationship will decrease with increasing life expectancy. We have not covered that, but one way to test that is to add a quadratic term to the linear regression equation (if you remember that a y = x^2 graph looks like an U, you might see that adding a part of that U to our straight line will result in a curved line) - that makes the situation better for continents with very different countries, i.e. Oceania --> we could continue this model building until we have found a reasonable (!!) well-fitting model
+
+ggplot(gapminder, aes(x = life_expectancy, y = infant_mortality, 
+                      colour = continent)) +
+  geom_smooth(method = "lm", formula = "y ~ x + I(x^2)", se = FALSE) +
+  geom_miss_point(alpha = .05)
+```
+
+This shows that developing a good imputation model can take a while, which makes casewise deletion attractive in practice. If you use casewise deletion, at least make sure to report how much missing data you have and whether it can be assumed to be missing completely at random. 
+
+If we settle on an imputation model, we can use simputation to model it. Note that I run multiple models subsequently to use gdp_per_capita where it is available.
+
+```{r}
+library(simputation)
+gapminder <- gapminder %>%
+  impute_lm(infant_mortality ~ life_expectancy * region * log(gdp_per_capita),
+            add_residual = "observed") %>%
+  impute_lm(infant_mortality ~ life_expectancy * region, 
+            add_residual = "observed")
+
+# Let's check if the imputed values generally make sense
+ggplot(gapminder, aes(x = continent, y = infant_mortality, color = infant_mortality_NA)) +
+  geom_jitter(alpha = .05, position=position_jitterdodge()) +
+  # position_jitterdodge moves the points away from each other (jitter) and
+  # in line with the boxplots (dodge) / take it out to see the difference
+    geom_boxplot(fill = NA)
+
+```
+
+This looks ok, apart from Oceania - ideally, we would figure out how to improve the predictions. In the end, we need to set 0 as the lower bound and set all imputed values below to 0.
+

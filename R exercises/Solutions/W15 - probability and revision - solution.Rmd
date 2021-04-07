@@ -1,0 +1,180 @@
+---
+title: "Core Quants Week 15 classwork"
+author: "YOUR NAME"
+date: "26/03/2020"
+output: html_document
+---
+
+# Some probabilities
+
+Some questions to answer, firstly ...
+
+## ... on a Polish's village "demographic mystery
+
+In Miejsce Odrzanskie, no boys have been born for almost a decase - during that time, 12 girls were born. This has been reported widely (https://www.nytimes.com/2019/08/06/world/europe/poland-village-girls-no-boys.html). But just how surprising is that?
+
+- How likely is it that this will be the case in Miejsce Odrzanskie for the next 12 babies, assuming a 50% chance of each baby being a boy?
+- How likely is it that this will be the case in at least one of Polands 2,479 gminas (local councils, a unit much larger than a village)?
+- What else would we need to consider to estimate how surprising that news story should be?
+
+```{r}
+#Chance for 12 female babies starting now
+0.5^12 
+
+#Chance for female 12 babies starting now - in some village (that is 1 - in no village)
+1-(1-0.5^12)^2479 
+
+#Not considered: 
+# - sequence can start at any point
+# - if only boys are as surprising as only girls, we only need to consider a run of 11
+#   that follows the first birth
+# ...
+```
+
+# ... on "feeling the future"
+
+In 2011, Garyl J. Bem published the research article ""Feeling the Future: Experimental Evidence for Anomalous Retroactive Influences on Cognition and Affect" that provided evidence that people can perceive the future before it has happened. The paper included 9 studies, 8 of which yielded significant results. Assuming, for a moment, that extra-sensory perception exists, 
+* how likely is that result, assuming 80% power? Calculate that manually with the approach shared in the module notes.
+
+```{r}
+#Calculate the probability of getting 8 significant and 1 non-significant result manually:
+eight_in_a_row <- .8^8
+one_non_significant <- .2
+eight_in_a_row * one_non_significant #Prob for outcome in that order
+eight_in_a_row * one_non_significant * 9 #Non-sign. study can be in 9 positions
+
+#You can alternatively calculate the probability for each possible outcome like this
+dbinom(0:9, size = 9, prob = 0.8)
+
+#Bem found an effect size of d = .22 across his experiments and typically used 150 participants or fewer. What power that does give us, assuming the use of a simple t-test? How does that power change the calculation above?
+pwr::pwr.t.test(n = 150, d = .22)
+
+#With actual power
+#To get 8 significant results
+dbinom(8, size = 9, prob = 0.48)
+
+#To get at least 8 significant results
+sum(dbinom(8:9, size = 9, prob = 0.48))
+```
+
+## ... on shared birthdays
+
+Imagine being in a room and talking about when people's birthday is.
+- how many people need to be there for you to have a 50% chance to find someone who shares your birthdays (just day and month, ignoring year)?
+- what about a 95% chance?
+
+Note that the easiest approach here is to calculate the probability for a given number of people, and then adjust that number up or down to get the result you want. Also remember that it is often easier to calculate the probability that something that does not happen at all rather than that it happens at least once.
+
+
+```{r}
+#Probability that I share a common birthday with a specific person
+common_birthday_with_someone <- 1/365.25
+
+#Probability that no-one shares my birthday 
+# - note that the 250 were arrived at by trying different numbers 
+(1-common_birthday_with_someone)^250
+```
+
+Now, if we are not thinking about you specifically, but about any two people sharing a birthday, how does the calculation differ?
+- how many people need to be in a room to have a 50% chance for at least two people to share a birthday?
+- how about a 95% chance?
+
+Here lots of people are going to compare their birthdays. As a hint, with 10 people, there are 10*9/2 pairs that can meet and compare birthdays (no need to learn in detail about combinations and permutation, but if you are so inclined: https://betterexplained.com/articles/easy-permutations-and-combinations/)
+
+```{r}
+common_birthday_with_someone <- 1/365.25
+number_of_people <- 23 #For 95%, 47 people
+number_of_possible_pairs <- number_of_people*(number_of_people-1)/2 
+
+#Prob of at least one pair sharing a birthday
+1-(1-common_birthday_with_someone)^(number_of_possible_pairs)
+
+```
+
+## On positive Covid tests
+
+Medical tests are evaluated by sensitivity (how many positive cases are correctly identified) and specificity (how many negative cases are correctly identified).
+
+Lateral flow tests have a sensitivity of ~76.8% and a specificity of ~99.68% [Source: Oxford University](https://www.ox.ac.uk/news/2020-11-11-oxford-university-and-phe-confirm-lateral-flow-tests-show-high-specificity-and-are)
+
+1 in 340 people in England had Covid-19 last week [Source: ONS](https://www.ons.gov.uk/peoplepopulationandcommunity/healthandsocialcare/conditionsanddiseases/bulletins/coronaviruscovid19infectionsurveypilot/19march2021)
+
+- Given (only) that population rate, how should you interpret a positive / negative lateral flow test result?
+
+- How would that be different in a situation like December (1 in 85 people) versus August (1 in 1,900 people)?
+
+
+```{r}
+# I am wrapping this into a function to reduce copy-pasting. To calculate without that, just remove the two lines with curly brackets and set the infection_rate variable at the start. However, the rule of three (write a function when copy-pasting results in more than two similar sections) is a good way to avoid mistakes.
+
+interpret_test <- function(infection_rate) {
+  print("Infection rate considered:")
+  print(infection_rate)
+  
+  # Out of 100,000 people
+  infected <- 100000/infection_rate
+  not_infected <- 100000 - infected
+
+  # Then, among positive tests
+  true_positives <- infected * 0.768
+  false_positives <- (1 - .9968) * not_infected
+
+  print("Probability of being infected given a positive test")
+  print(true_positives / (true_positives + false_positives))
+
+  # And, among negative tests
+  true_negatives <- .9968 * not_infected
+  false_negatives <- (1 - .768) * infected
+
+  print("Probability of NOT being infected given a negative test")
+  print(true_negatives / (true_negatives + false_negatives))
+  
+  invisible(NULL)
+}
+
+interpret_test(340)
+interpret_test(85)
+interpret_test(1900)
+
+```
+
+
+# Choosing statistical tests
+
+What statistical tests would you use to test the following? What key R functions would you use?
+- whether the share of countries in income groups (i.e. low, middle, high) differs significantly between continents?
+
+```{r eval=FALSE}
+#Won't run unless you load that data - therefore, I have to set eval = FALSE in this chunk to knit the document
+chisq.test(WorldBankL$Region, WorldBankL$`Income Group`)
+chisq.posthoc.test::chisq.posthoc.test(table(WorldBankL$Region, WorldBankL$`Income Group`))
+
+```
+
+
+- whether the strength of the link between GDP and life expectancy *differs* between continents? (Difference in effect of one variable on another depending on value of a third --> interaction)
+
+```{r message=FALSE}
+library(tidyverse)
+gapminder2010 <- dslabs::gapminder %>% filter(year == 2010) %>% mutate(gdp_per_capita = gdp/population)
+lm(life_expectancy ~ log(gdp_per_capita) * continent, gapminder2010) %>% summary()
+```
+
+
+- whether changes in fertility affect life expectancy through a reduction in infant mortality? (Effect going through something else --> mediation)
+
+```{r}
+psych::mediate(life_expectancy ~ fertility + (infant_mortality), data = gapminder2010)
+```
+
+
+- Whether we can assume that data is missing completely at random, so that casewise deletion does not introduce bias?
+
+```{r eval=FALSE}
+# There is a test, called Little's MCAR. It can be helpful if you want to argue that you can safely ignore missing data. At the moment, it is only part of the development version of naniar, which you would need to get from GitHub. It also fails on the gapminder2010 dataset (https://github.com/njtierney/naniar/issues/282) - but feel free to consider it if it works on your data.
+
+pacman::p_load_current_gh("njtierney/naniar")
+mcar_test(gapminder2010)
+
+```
+
